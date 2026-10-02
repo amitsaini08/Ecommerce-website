@@ -133,7 +133,7 @@ export default function AdminOrderDetailPage() {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-base font-bold text-warm-900">
-                Order #{order.id.slice(0, 8)}
+                Order #{String(order._id || order.id).slice(0, 8)}
               </h1>
               <span
                 className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full capitalize ${statusColors[order.status]}`}
@@ -230,7 +230,7 @@ export default function AdminOrderDetailPage() {
               <div className="space-y-3">
                 {items.map((item) => (
                   <div
-                    key={item.id}
+                    key={item._id || item.id}
                     className="flex gap-3 p-2.5 rounded-lg hover:bg-warm-50/70 transition-colors"
                   >
                     <div className="w-12 h-12 rounded-lg bg-warm-50 shrink-0 relative overflow-hidden border border-warm-100">
@@ -319,7 +319,7 @@ export default function AdminOrderDetailPage() {
                   <div className="absolute left-[5px] top-2 bottom-2 w-px bg-warm-200" />
                   <div className="space-y-4">
                     {history.map((h, index) => (
-                      <div key={h.id} className="flex gap-3 relative">
+                      <div key={h._id || h.id} className="flex gap-3 relative">
                         <div
                           className={`w-[11px] h-[11px] rounded-full shrink-0 mt-1 z-10 border-2 border-white ${index === 0 ? 'bg-brand-500' : 'bg-warm-300'
                             }`}

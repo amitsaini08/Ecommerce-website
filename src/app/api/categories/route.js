@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase, Category } from '@/lib/db/models';
+import { routeHandler } from '../routeHandler';
 
-export async function GET() {
-  try {
-    await connectToDatabase();
+
+export const GET = routeHandler({
+  handler: async () => {
+      
     const allCategories = await Category.find().sort({ name: 1 }).lean();
 
     const rootCategories = allCategories.filter((c) => !c.parentIds || c.parentIds.length === 0);
@@ -11,19 +13,16 @@ export async function GET() {
     allCategories.forEach((c) => {
       (c.parentIds || []).forEach((pid) => {
         if (!childMap[pid]) childMap[pid] = [];
-        childMap[pid].push({ ...c, id: c._id });
+        childMap[pid].push(c);
       });
     });
 
     const categoriesWithChildren = rootCategories.map((cat) => ({
       ...cat,
-      id: cat._id,
+      _id: cat._id,
       children: childMap[cat._id] || [],
     }));
 
     return NextResponse.json({ categories: categoriesWithChildren });
-  } catch (error) {
-    console.error('Categories API error:', error);
-    return NextResponse.json({ error: 'Failed to fetch categories' },{ status: 500 });
   }
-}
+})

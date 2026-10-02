@@ -1,85 +1,45 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase, User } from '@/lib/db/models';
-import { getAuthUser } from '@/lib/auth';
+import { User } from '@/lib/db/models';
 import { updateProfileSchema } from '@/lib/validations';
-import { parseAndValidate } from '@/lib/sanitization';
+import { routeHandler, AppError } from '@/app/api/routeHandler';
 
-export async function GET(request) {
-  try {
-    const authUser = await getAuthUser(request);
-    if (!authUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    await connectToDatabase();
-    const user = await User.findById(authUser.id).lean();
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    const { passwordHash, otp, resetOtp, ...safeUser } = user;
-    const addresses = (user.addresses || []).map((a) => ({ ...a, id: a._id }));
-
+export const GET = routeHandler({
+  auth: true,
+  roles: ['customer', 'admin'],
+  handler: async (request, { user }) => {
+    const { passwordHash, ...safeUser } = user;
     return NextResponse.json({
-      user: { ...safeUser, id: user._id },
-      addresses,
+      user: safeUser,
+      addresses: user.addresses || [],
     });
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 });
-  }
-}
+  },
+});
 
-export async function PUT(request) {
-  try {
-    const authUser = await getAuthUser(request);
-    if (!authUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export const PUT = routeHandler({
+  auth: true,
+  roles: ['customer', 'admin'],
+  schema: updateProfileSchema,
+  handler: async (request, { user, data }) => {
+    const { name, phone, avatarUrl } = data;
+    const dbUser = await User.findById(user._id);
+    if (!dbUser) throw new AppError('User not found', 404);
 
-    const rawBody = await request.json().catch(() => ({}));
-    const validation = parseAndValidate(updateProfileSchema, rawBody);
+    dbUser.name = name;
+    dbUser.phone = phone || null;
+    if (avatarUrl !== undefined) dbUser.avatarUrl = avatarUrl || null;
 
-    if (!validation.success) {
-      const firstError = validation.errors[0];
-      return NextResponse.json(
-        {
-          error: firstError?.message || 'Validation failed',
-          field: firstError?.field,
-          errors: validation.errors,
-        },
-        { status: 400 }
-      );
-    }
-
-    const { name, phone, avatarUrl } = validation.sanitizedData;
-
-    await connectToDatabase();
-    const user = await User.findById(authUser.id);
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    user.name = name;
-    user.phone = phone || null;
-    if (avatarUrl !== undefined) {
-      user.avatarUrl = avatarUrl || null;
-    }
-
-    await user.save();
+    await dbUser.save();
 
     return NextResponse.json({
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        avatarUrl: user.avatarUrl,
+        _id: String(dbUser._id),
+        name: dbUser.name,
+        email: dbUser.email,
+        phone: dbUser.phone,
+        role: dbUser.role,
+        avatarUrl: dbUser.avatarUrl,
       },
       message: 'Profile updated successfully!',
     });
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
-  }
-}
+  },
+});

@@ -1,21 +1,18 @@
-
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronDown, ChevronRight, Folder, Search, X, Check, Loader2 } from 'lucide-react';
 
 const No_Exclude = new Set();
-export default function CategoryTreeSelect({ value = [], onChange, placeholder = 'Select categories...', excludeIds  = No_Exclude }) {
+export default function CategoryTreeSelect({ value = [], onChange, placeholder = 'Select categories...', excludeIds = No_Exclude }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
 
- 
   const [childrenCache, setChildrenCache] = useState({});
   const [expandedIds, setExpandedIds] = useState(new Set());
-
   const [labelsById, setLabelsById] = useState({});
 
   const containerRef = useRef(null);
@@ -66,13 +63,11 @@ export default function CategoryTreeSelect({ value = [], onChange, placeholder =
     }
   }, []);
 
-
   useEffect(() => {
     if (isOpen && !childrenCache.root?.loaded && !childrenCache.root?.loading) {
       fetchLevel('root');
     }
   }, [isOpen, childrenCache.root, fetchLevel]);
-
 
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchInput.trim()), 200);
@@ -99,7 +94,6 @@ export default function CategoryTreeSelect({ value = [], onChange, placeholder =
     };
   }, [search]);
 
-
   useEffect(() => {
     const missing = value.filter((id) => id && !labelsById[id]);
     if (missing.length === 0) return;
@@ -109,7 +103,8 @@ export default function CategoryTreeSelect({ value = [], onChange, placeholder =
         setLabelsById((prev) => {
           const next = { ...prev };
           (d.categories || []).forEach((c) => {
-            next[c.id] = c.name;
+            const cid = String(c._id || c.id);
+            next[cid] = c.name;
           });
           return next;
         });
@@ -135,21 +130,21 @@ export default function CategoryTreeSelect({ value = [], onChange, placeholder =
     onChange(exists ? value.filter((v) => v !== id) : [...value, id]);
   }
 
-  
   function buildVisibleRows() {
     const rows = [];
     function walk(parentKey, depth) {
       const level = childrenCache[parentKey];
       if (!level) return;
       (level.items || []).forEach((cat) => {
-        if (excludeIds.has(cat.id)) return;
-        const isExpanded = expandedIds.has(cat.id);
-        rows.push({ ...cat, depth, rowKey: `${parentKey}-${cat.id}`, isExpanded });
+        const cid = String(cat._id || cat.id);
+        if (excludeIds.has(cid)) return;
+        const isExpanded = expandedIds.has(cid);
+        rows.push({ ...cat, _id: cid, depth, rowKey: `${parentKey}-${cid}`, isExpanded });
         if (isExpanded) {
-          if (childrenCache[cat.id]?.loading) {
-            rows.push({ __skeleton: true, rowKey: `${cat.id}-skeleton`, depth: depth + 1 });
+          if (childrenCache[cid]?.loading) {
+            rows.push({ __skeleton: true, rowKey: `${cid}-skeleton`, depth: depth + 1 });
           } else {
-            walk(cat.id, depth + 1);
+            walk(cid, depth + 1);
           }
         }
       });
@@ -164,7 +159,9 @@ export default function CategoryTreeSelect({ value = [], onChange, placeholder =
   }
 
   const inSearchMode = search.length > 0;
-  const rows = inSearchMode ? (searchResults || []).filter((c) => !excludeIds.has(c.id)) : buildVisibleRows();
+  const rows = inSearchMode
+    ? (searchResults || []).filter((c) => !excludeIds.has(String(c._id || c.id))).map(c => ({ ...c, _id: String(c._id || c.id) }))
+    : buildVisibleRows();
   const selectedChips = value.map((id) => ({ id, name: labelsById[id] })).filter((c) => c.name);
 
   return (
@@ -235,11 +232,12 @@ export default function CategoryTreeSelect({ value = [], onChange, placeholder =
                     </button>
                   );
                 }
-                const isSelected = value.includes(cat.id);
+                const cid = String(cat._id || cat.id);
+                const isSelected = value.includes(cid);
                 return (
                   <div
-                    key={inSearchMode ? cat.id : cat.rowKey}
-                    onClick={() => toggleSelect(cat.id, cat.name)}
+                    key={inSearchMode ? cid : cat.rowKey}
+                    onClick={() => toggleSelect(cid, cat.name)}
                     className={`flex items-center gap-1.5 px-2 py-1.5 cursor-pointer text-[11px] font-medium transition-colors ${
                       isSelected ? 'bg-brand-50/70' : 'hover:bg-warm-50'
                     }`}
@@ -248,10 +246,10 @@ export default function CategoryTreeSelect({ value = [], onChange, placeholder =
                       <span
                         onClick={(e) => {
                           e.stopPropagation();
-                          toggleExpand(cat.id);
+                          toggleExpand(cid);
                         }}
                         className="p-0.5 text-warm-400 hover:text-warm-900 shrink-0" >
-                        {childrenCache[cat.id]?.loading ? (
+                        {childrenCache[cid]?.loading ? (
                           <Loader2 className="w-3 h-3 animate-spin" />
                         ) : ( <ChevronRight className={`w-3 h-3 transition-transform ${cat.isExpanded ? 'rotate-90' : ''}`} /> )}
                       </span>

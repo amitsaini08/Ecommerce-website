@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase, Category, Product } from '@/lib/db/models';
 import { getAllDescendantIds } from '@/lib/categoryHelpers';
+import { routeHandler } from '../../routeHandler';
 
-export async function GET(request, { params }) {
-  try {
+
+
+export const GET = routeHandler({
+  handler: async (request, { params }) => {
     const { slug } = await params;
 
-    await connectToDatabase();
     const category = await Category.findOne({ slug }).lean();
 
     if (!category) {
@@ -14,27 +16,17 @@ export async function GET(request, { params }) {
     }
 
     const subcategories = await Category.find({ parentIds: category._id }).lean();
-
     const descendantIds = await getAllDescendantIds(category._id);
     const relevantCategoryIds = [category._id, ...Array.from(descendantIds)];
 
     const categoryProducts = await Product.find({ categoryIds: { $in: relevantCategoryIds }, isActive: true })
-      .sort({ createdAt: -1 })
-      .limit(20)
-      .lean();
+      .sort({ createdAt: -1 }).limit(20).lean();
 
     const sanitizedProducts = categoryProducts.map((p) => {
       const { productLink, ...rest } = p;
-      return { ...rest, id: p._id };
+      return rest ;
     });
 
-    return NextResponse.json({
-      category: { ...category, id: category._id },
-      subcategories: subcategories.map((s) => ({ ...s, id: s._id })),
-      products: sanitizedProducts,
-    });
-  } catch (error) {
-    console.error('Category detail error:', error);
-    return NextResponse.json({ error: 'Failed to fetch category' }, { status: 500 });
-  }
-}
+    return NextResponse.json({ category,  subcategories,  products: sanitizedProducts});
+  },
+});

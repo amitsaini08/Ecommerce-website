@@ -1,19 +1,26 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
-import { connectToDatabase, PageView } from '@/lib/db/models';
+import { PageView } from '@/lib/db/models';
+import { routeHandler } from '@/app/api/routeHandler';
+import { z } from 'zod';
 
-export async function POST(req) {
-  try {
-    const body = await req.json();
-    const { path, userAgent = '' } = body;
+const trackSchema = z.object({
+  path: z.string(),
+  userAgent: z.string().optional(),
+});
+
+export const POST = routeHandler({
+  schema: trackSchema,
+  handler: async (request, { data }) => {
+    const { path, userAgent = '' } = data;
 
     if (!path || path.startsWith('/admin') || path.startsWith('/api')) {
       return NextResponse.json({ success: false });
     }
 
     const cookieStore = await cookies();
-    let visitorId = cookieStore.get('nova_visitor_id')?.value || cookieStore.get('hh_visitor_id')?.value;
+    let visitorId = cookieStore.get('nova_visitor_id')?.value;
     let newCookieSet = false;
 
     if (!visitorId) {
@@ -29,14 +36,12 @@ export async function POST(req) {
       device = 'mobile';
     }
 
-    await connectToDatabase();
     await PageView.create({
-      _id: crypto.randomUUID(),
       visitorId,
       path: path.split('?')[0],
       userAgent,
       device,
-      referrer: req.headers.get('referer') || null,
+      referrer: request.headers.get('referer') || null,
     });
 
     const response = NextResponse.json({ success: true });
@@ -51,7 +56,5 @@ export async function POST(req) {
     }
 
     return response;
-  } catch (err) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
-  }
-}
+  },
+});

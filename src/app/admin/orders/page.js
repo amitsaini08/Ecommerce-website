@@ -46,7 +46,7 @@ let cachedFilters = { status: '', search: '', paymentStatus: '', paymentMethod: 
 export function invalidateOrder(orderId) {
   for (const page of Object.keys(cachedOrders)) {
     const data = cachedOrders[page]?.data || [];
-    if (data.some((o) => o.id === orderId)) {
+    if (data.some((o) => String(o._id || o.id) === String(orderId))) {
       delete cachedOrders[page];
     }
   }
@@ -142,8 +142,8 @@ export default function AdminOrdersPage() {
           <button
             onClick={clearFilters}
             className={`px-3 py-1 text-[11px] font-semibold rounded-md border transition-all whitespace-nowrap ${hasActiveFilters
-                ? 'text-brand-600 border-brand-200 bg-brand-50 hover:bg-brand-100 opacity-100'
-                : 'invisible opacity-0 pointer-events-none border-transparent'
+              ? 'text-brand-600 border-brand-200 bg-brand-50 hover:bg-brand-100 opacity-100'
+              : 'invisible opacity-0 pointer-events-none border-transparent'
               }`}
           >
             Clear Filters
@@ -252,41 +252,43 @@ export default function AdminOrdersPage() {
               <tr><td colSpan={6} className="px-3 py-6 text-center text-warm-400 text-[11px]">Loading orders...</td></tr>
             ) : currentOrders.length === 0 ? (
               <tr><td colSpan={6} className="px-3 py-6 text-center text-warm-400 text-[11px]">No orders found.</td></tr>
-            ) : currentOrders.map((o) => (
-              <tr
-                key={o.id}
-                onClick={() => router.push(`/admin/orders/${o.id}`)}
-                className="hover:bg-warm-50/50 transition-colors cursor-pointer"
-              >
-                <td className="px-3 py-2.5 font-mono text-[10px] text-warm-900 font-medium">{o.id.slice(0, 8)}</td>
-                <td className="px-3 py-2.5">
-                  <div>
-                    <p className="text-warm-900 font-medium text-[11px]">{o.userName || '—'}</p>
-                    <p className="text-warm-400 text-[10px]">{o.userEmail}</p>
-                    {o.userPhone && <p className="text-warm-500 text-[10px] font-mono">📞 {o.userPhone}</p>}
-                  </div>
-                </td>
-                <td className="px-3 py-2.5 font-bold text-warm-900">{formatCurrency(o.totalAmount)}</td>
-                <td className="px-3 py-2.5">
-                  <div className="flex flex-col gap-1 items-start">
-                    <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full capitalize ${statusColors[o.status] || 'bg-warm-100 text-warm-600'}`}>
-                      {o.status}
-                    </span>
-                    {o.paymentStatus === 'pending' && (
-                      <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-100 text-amber-900 uppercase border border-amber-300">
-                        Payment Pending
+            ) : currentOrders.map((o) => {
+              const orderId = o._id || o.id;
+              return (
+                <tr
+                  key={orderId}
+                  onClick={() => router.push(`/admin/orders/${orderId}`)}
+                  className="hover:bg-warm-50/50 transition-colors cursor-pointer"
+                >
+                  <td className="px-3 py-2.5 font-mono text-[10px] text-warm-900 font-medium">{String(orderId).slice(0, 8)}</td>
+                  <td className="px-3 py-2.5">
+                    <div>
+                      <p className="text-warm-900 font-medium text-[11px]">{o.userName || '—'}</p>
+                      <p className="text-warm-400 text-[10px]">{o.userEmail}</p>
+                      {o.userPhone && <p className="text-warm-500 text-[10px] font-mono">📞 {o.userPhone}</p>}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5 font-bold text-warm-900">{formatCurrency(o.totalAmount)}</td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex flex-col gap-1 items-start">
+                      <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full capitalize ${statusColors[o.status] || 'bg-warm-100 text-warm-600'}`}>
+                        {o.status}
                       </span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-3 py-2.5 text-warm-500 text-[10px]">{new Date(o.createdAt).toLocaleDateString()}</td>
-                <td className="px-3 py-2.5 text-right">
-                  <span className="text-warm-900 font-semibold text-[10px]">
-                    View Details →
-                  </span>
-                </td>
-              </tr>
-            ))}
+                      {o.paymentStatus === 'pending' && (
+                        <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-100 text-amber-900 uppercase border border-amber-300">
+                          Payment Pending
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5 text-warm-500 text-[10px]">{new Date(o.createdAt).toLocaleDateString()}</td>
+                  <td className="px-3 py-2.5 text-right">
+                    <span className="text-warm-900 font-semibold text-[10px]">
+                      View Details →
+                    </span>
+                  </td>
+                </tr>
+              )})}
           </tbody>
         </table>
       </div>

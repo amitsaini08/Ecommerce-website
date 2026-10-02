@@ -1,52 +1,38 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase, User } from '@/lib/db/models';
-import { requireAdmin } from '@/lib/auth';
+import { User } from '@/lib/db/models';
+import { routeHandler, AppError } from '@/app/api/routeHandler';
+import { z } from 'zod';
 
-export async function GET(request) {
-  try {
-    await requireAdmin(request);
+const updateUserRoleSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+  role: z.enum(['customer', 'admin']),
+});
+
+export const GET = routeHandler({
+  auth: true,
+  roles: ['admin'],
+  handler: async (request) => {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = (page - 1) * limit;
 
-    await connectToDatabase();
-    const list = await User.find()
-      .select('_id name email role isVerified createdAt')
-      .sort({ createdAt: -1 })
-      .skip(offset)
-      .limit(limit)
-      .lean();
-
+    const users = await User.find().select('_id name email role isVerified createdAt').sort({ createdAt: -1 }).skip(offset).limit(limit).lean();
     const count = await User.countDocuments();
-    return NextResponse.json({
-      users: list.map((u) => ({ ...u, id: u._id })),
-      pagination: { page, limit, total: count, totalPages: Math.ceil(count / limit) },
-    });
-  } catch (error) {
-    if (error.message === 'Unauthorized' || error.message === 'Forbidden')
-      return NextResponse.json({ error: error.message }, { status: 403 });
-    return NextResponse.json({ error: 'Failed' }, { status: 500 });
-  }
-}
+    return NextResponse.json({ users, pagination: { page, limit, total: count, totalPages: Math.ceil(count / limit) } });
+  },
+});
 
-export async function PATCH(request) {
-  try {
-    await requireAdmin(request);
-    const { userId, role } = await request.json();
-    if (!userId || !role) return NextResponse.json({ error: 'userId and role required' }, { status: 400 });
+export const PATCH = routeHandler({
+  auth: true,
+  roles: ['admin'],
+  schema: updateUserRoleSchema,
+  handler: async (request, { data }) => {
+    const user = await User.findById(data.userId);
+    if (!user) throw new AppError('User not found', 404);
 
-    await connectToDatabase();
-    const user = await User.findById(userId);
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
-
-    user.role = role;
+    user.role = data.role;
     await user.save();
-
-    return NextResponse.json({ user: { ...user.toObject(), id: user._id } });
-  } catch (error) {
-    if (error.message === 'Unauthorized' || error.message === 'Forbidden')
-      return NextResponse.json({ error: error.message }, { status: 403 });
-    return NextResponse.json({ error: 'Failed' }, { status: 500 });
-  }
-}
+    return NextResponse.json({ user });
+  },
+});

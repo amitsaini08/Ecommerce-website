@@ -1,22 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useState, useEffect, useCallback } from 'react';
 import {
-  FiPackage,
-  FiShoppingCart,
-  FiUsers,
-  FiDollarSign,
-  FiAlertTriangle,
-  FiArrowRight,
-  FiEye,
-  FiTrendingUp,
-  FiTrendingDown,
-  FiRefreshCw,
-  FiMonitor,
-  FiSmartphone,
-  FiTablet,
-} from 'react-icons/fi';
+  Package,
+  ShoppingCart,
+  Users,
+  IndianRupee,
+  AlertTriangle,
+  ArrowRight,
+  Eye,
+  TrendingUp,
+  TrendingDown,
+  RefreshCw,
+  Monitor,
+  Smartphone,
+  Tablet,
+} from 'lucide-react';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -26,342 +25,365 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatNumber } from '@/lib/utils';
+import { cn } from '@/lib/cn';
+import PageHeader from '@/components/ui/PageHeader';
+import Card from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import IconButton from '@/components/ui/IconButton';
+import Alert from '@/components/ui/Alert';
+
+const POLL_MS = 30000;
+
+// recharts CSS classes nahi leta, isliye hex yahin ek jagah
+const CHART = { views: '#4f46e5', visitors: '#10b981', grid: '#f1f5f9', tick: '#64748b' };
+
+const TONES = {
+  blue: 'border-blue-200 bg-blue-50 text-blue-700',
+  indigo: 'border-indigo-200 bg-indigo-50 text-indigo-700',
+  emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  amber: 'border-amber-200 bg-amber-50 text-amber-700',
+};
+
+const DEVICE_ICONS = { Mobile: Smartphone, Tablet: Tablet };
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState('');
+  const [error, setError] = useState('');
 
-  async function loadData(isManual = false) {
-    if (isManual) setRefreshing(true);
+  const loadData = useCallback(async ({ manual = false, signal } = {}) => {
+    if (manual) setRefreshing(true);
+
     try {
       const [statsRes, analyticsRes] = await Promise.all([
-        fetch('/api/admin/stats'),
-        fetch('/api/admin/analytics'),
+        fetch('/api/admin/stats', { signal }),
+        fetch('/api/admin/analytics', { signal }),
       ]);
 
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        setStats(statsData);
-      }
+      if (statsRes.ok) setStats(await statsRes.json());
+      if (analyticsRes.ok) setAnalytics(await analyticsRes.json());
 
-      if (analyticsRes.ok) {
-        const analyticsData = await analyticsRes.json();
-        setAnalytics(analyticsData);
+      if (!statsRes.ok || !analyticsRes.ok) {
+        setError('Some dashboard data could not be loaded.');
+      } else {
+        setError('');
+        setLastUpdated(new Date().toLocaleTimeString('en-IN'));
       }
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      setError('Could not reach the server. Retrying automatically.');
+    }
 
-      setLastUpdated(new Date().toLocaleTimeString());
-    } catch {}
     setLoading(false);
     setRefreshing(false);
-  }
+  }, []);
 
   useEffect(() => {
-    loadData();
-    const interval = setInterval(() => {
-      loadData();
-    }, 30000); // 30s polling
-    return () => clearInterval(interval);
-  }, []);
+    const controller = new AbortController();
+    loadData({ signal: controller.signal });
+
+    // tab hidden ho to polling skip
+    const id = setInterval(() => {
+      if (!document.hidden) loadData({ signal: controller.signal });
+    }, POLL_MS);
+
+    return () => {
+      controller.abort();
+      clearInterval(id);
+    };
+  }, [loadData]);
+
+  const metrics = analytics?.metrics;
 
   const statCards = [
     {
-      label: '30-Day Visitors',
-      value: analytics?.metrics?.uniqueVisitors?.toLocaleString() || '0',
-      change: analytics?.metrics?.uniqueVisitorsChangePct || 0,
-      icon: FiUsers,
-      color: 'bg-blue-50 text-blue-700 border-blue-200',
+      label: '30-day visitors',
+      value: formatNumber(metrics?.uniqueVisitors),
+      change: metrics?.uniqueVisitorsChangePct,
+      icon: Users,
+      tone: 'blue',
     },
     {
-      label: '30-Day Page Views',
-      value: analytics?.metrics?.totalPageViews?.toLocaleString() || '0',
-      change: analytics?.metrics?.pageViewsChangePct || 0,
-      icon: FiEye,
-      color: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+      label: '30-day page views',
+      value: formatNumber(metrics?.totalPageViews),
+      change: metrics?.pageViewsChangePct,
+      icon: Eye,
+      tone: 'indigo',
     },
     {
-      label: 'Total Orders',
-      value: stats?.totalOrders || '0',
-      icon: FiShoppingCart,
-      color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      label: 'Total orders',
+      value: formatNumber(stats?.totalOrders),
+      icon: ShoppingCart,
+      tone: 'emerald',
     },
     {
-      label: 'Total Revenue',
+      label: 'Total revenue',
       value: formatCurrency(stats?.totalRevenue || 0),
-      icon: FiDollarSign,
-      color: 'bg-amber-50 text-amber-700 border-amber-200',
+      icon: IndianRupee,
+      tone: 'amber',
     },
   ];
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-warm-200 pb-3">
-        <div>
-          <h1 className="text-base font-bold text-warm-900 tracking-tight">Dashboard Overview</h1>
-          <p className="text-[11px] text-warm-500 mt-0.5">
-            Real-time storefront performance, traffic metrics, and inventory alerts.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Live Polling (30s)
-          </span>
-          {lastUpdated && (
-            <span className="text-[10px] text-warm-400 font-mono hidden sm:inline">
-              Updated: {lastUpdated}
-            </span>
-          )}
-          <button
-            onClick={() => loadData(true)}
-            disabled={refreshing}
-            className="p-1.5 border border-warm-200 rounded-md text-warm-600 hover:bg-warm-50 transition-colors disabled:opacity-50"
-            title="Refresh now"
-          >
-            <FiRefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Dashboard"
+        subtitle="Real-time storefront performance, traffic metrics, and inventory alerts."
+        actions={
+          <>
+            <Badge tone="success" className="gap-1.5">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+              Live (30s)
+            </Badge>
+            {lastUpdated && (
+              <span className="hidden text-xs text-warm-400 sm:inline">Updated {lastUpdated}</span>
+            )}
+            <IconButton
+              label="Refresh now"
+              title="Refresh now"
+              onClick={() => loadData({ manual: true })}
+              disabled={refreshing}
+              className="border border-warm-200"
+            >
+              <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
+            </IconButton>
+          </>
+        }
+      />
+
+      {error && <Alert>{error}</Alert>}
 
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-20 rounded-md bg-warm-100 animate-pulse" />
+            <div key={i} className="h-28 animate-pulse rounded-xl bg-warm-100" />
           ))}
         </div>
       ) : (
         <>
-          {/* Metrics Overview Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {statCards.map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <div
-                  key={stat.label}
-                  className="p-3 bg-white rounded-md border border-warm-200 shadow-xs flex flex-col justify-between"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-semibold text-warm-500 uppercase tracking-wider">
-                      {stat.label}
-                    </span>
-                    <div className={`w-6 h-6 rounded-md flex items-center justify-center border ${stat.color}`}>
-                      <Icon className="w-3 h-3" />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex items-baseline justify-between">
-                      <p className="text-lg font-bold text-warm-900 tracking-tight">{stat.value}</p>
-                      {stat.change !== undefined && (
-                        <span
-                          className={`inline-flex items-center gap-0.5 text-[10px] font-bold ${
-                            stat.change >= 0 ? 'text-emerald-600' : 'text-rose-600'
-                          }`}
-                        >
-                          {stat.change >= 0 ? (
-                            <FiTrendingUp className="w-2.5 h-2.5" />
-                          ) : (
-                            <FiTrendingDown className="w-2.5 h-2.5" />
-                          )}
-                          {Math.abs(stat.change)}% vs prev 30d
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          {/* Stat cards */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {statCards.map((stat) => (
+              <StatCard key={stat.label} {...stat} />
+            ))}
           </div>
 
-          {/* Traffic Chart & Devices */}
-          <div className="grid lg:grid-cols-3 gap-4">
-            {/* 30-Day Visitors Line Chart */}
-            <div className="lg:col-span-2 p-4 bg-white rounded-md border border-warm-200 shadow-xs space-y-3">
-              <div className="flex items-center justify-between border-b border-warm-100 pb-2">
-                <div>
-                  <h2 className="font-bold text-warm-900 text-[13px]">Store Traffic (Last 30 Days)</h2>
-                  <p className="text-[10px] text-warm-500">Unique visitors and total page views per day</p>
-                </div>
-                <div className="flex items-center gap-3 text-[10px] font-semibold">
-                  <span className="flex items-center gap-1 text-brand-600">
-                    <span className="w-2 h-2 rounded-full bg-brand-600" /> Page Views
+          {/* Traffic + devices */}
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Card
+              className="lg:col-span-2"
+              title="Store traffic (last 30 days)"
+              description="Unique visitors and total page views per day"
+              actions={
+                <div className="hidden items-center gap-3 text-xs font-semibold sm:flex">
+                  <span className="flex items-center gap-1.5 text-indigo-600">
+                    <span className="h-2 w-2 rounded-full bg-indigo-600" /> Page views
                   </span>
-                  <span className="flex items-center gap-1 text-emerald-600">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> Unique Visitors
+                  <span className="flex items-center gap-1.5 text-emerald-600">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" /> Visitors
                   </span>
                 </div>
-              </div>
-
-              <div className="h-48 w-full">
+              }
+            >
+              <div className="h-56 w-full">
                 {analytics?.chartData?.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={analytics.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <AreaChart
+                      data={analytics.chartData}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
                       <defs>
                         <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.2} />
-                          <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
+                          <stop offset="5%" stopColor={CHART.views} stopOpacity={0.2} />
+                          <stop offset="95%" stopColor={CHART.views} stopOpacity={0} />
                         </linearGradient>
                         <linearGradient id="colorVisitors" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                          <stop offset="5%" stopColor={CHART.visitors} stopOpacity={0.2} />
+                          <stop offset="95%" stopColor={CHART.visitors} stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART.grid} />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 12, fill: CHART.tick }}
+                        tickLine={false}
+                        minTickGap={24}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 12, fill: CHART.tick }}
+                        tickLine={false}
+                        axisLine={false}
+                      />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: '#ffffff',
-                          borderRadius: '6px',
+                          borderRadius: 12,
                           border: '1px solid #e2e8f0',
-                          fontSize: '11px',
+                          fontSize: 12,
                           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                         }}
                       />
                       <Area
                         type="monotone"
                         dataKey="views"
-                        stroke="#4f46e5"
-                        strokeWidth={1.5}
-                        fillOpacity={1}
+                        name="Page views"
+                        stroke={CHART.views}
+                        strokeWidth={2}
                         fill="url(#colorViews)"
-                        name="Page Views"
                       />
                       <Area
                         type="monotone"
                         dataKey="visitors"
-                        stroke="#10b981"
-                        strokeWidth={1.5}
-                        fillOpacity={1}
+                        name="Unique visitors"
+                        stroke={CHART.visitors}
+                        strokeWidth={2}
                         fill="url(#colorVisitors)"
-                        name="Unique Visitors"
                       />
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-[10px] text-warm-400">
-                    No traffic data recorded in last 30 days. Browse store pages to generate live analytics traffic!
-                  </div>
+                  <p className="flex h-full items-center justify-center text-center text-sm text-warm-400">
+                    No traffic recorded in the last 30 days.
+                  </p>
                 )}
               </div>
-            </div>
+            </Card>
 
-            {/* Device Breakdown */}
-            <div className="p-4 bg-white rounded-md border border-warm-200 shadow-xs space-y-3 flex flex-col justify-between">
-              <div>
-                <h2 className="font-bold text-warm-900 text-[13px] pb-2 border-b border-warm-100">
-                  Device Breakdown
-                </h2>
-                <p className="text-[10px] text-warm-500 mt-1 mb-3">
-                  Distribution of traffic by visitor client device
-                </p>
-
-                <div className="space-y-3">
-                  {analytics?.deviceBreakdown?.length > 0 ? (
-                    analytics.deviceBreakdown.map((dev, idx) => {
-                      const Icon =
-                        dev.name === 'Mobile'
-                          ? FiSmartphone
-                          : dev.name === 'Tablet'
-                          ? FiTablet
-                          : FiMonitor;
-                      return (
-                        <div key={`${dev.name}-${idx}`} className="space-y-1">
-                          <div className="flex justify-between text-[10px] font-semibold">
-                            <span className="flex items-center gap-1 text-warm-700">
-                              <Icon className="w-3 h-3 text-warm-500" /> {dev.name}
-                            </span>
-                            <span className="text-warm-900">{dev.percentage}% ({dev.value.toLocaleString()})</span>
-                          </div>
-                          <div className="w-full h-1.5 bg-warm-100 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-brand-600 rounded-full transition-all duration-500"
-                              style={{ width: `${dev.percentage}%` }}
-                            />
-                          </div>
+            <Card
+              title="Device breakdown"
+              description="Traffic by visitor device"
+              className="flex flex-col"
+            >
+              <div className="flex-1 space-y-4">
+                {analytics?.deviceBreakdown?.length > 0 ? (
+                  analytics.deviceBreakdown.map((dev) => {
+                    const Icon = DEVICE_ICONS[dev.name] || Monitor;
+                    return (
+                      <div key={dev.name} className="space-y-1.5">
+                        <div className="flex justify-between text-sm font-medium">
+                          <span className="flex items-center gap-1.5 text-warm-700">
+                            <Icon className="h-4 w-4 text-warm-500" /> {dev.name}
+                          </span>
+                          <span className="text-warm-900">
+                            {dev.percentage}% ({formatNumber(dev.value)})
+                          </span>
                         </div>
-                      );
-                    })
-                  ) : (
-                    <p className="text-[10px] text-warm-400 text-center py-4">No device data available yet.</p>
-                  )}
-                </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-warm-100">
+                          <div
+                            className="h-full rounded-full bg-brand-600 transition-all duration-500"
+                            style={{ width: `${dev.percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="py-4 text-center text-sm text-warm-400">No device data yet.</p>
+                )}
               </div>
 
-              <div className="pt-3 border-t border-warm-100 text-[10px] text-warm-500 flex justify-between">
-                <span>Avg Session Duration:</span>
-                <span className="font-bold text-warm-900">{analytics?.metrics?.avgSessionDuration || '0m 0s'}</span>
+              <div className="mt-4 flex justify-between border-t border-warm-100 pt-3 text-sm text-warm-500">
+                <span>Avg session duration</span>
+                <span className="font-bold text-warm-900">{metrics?.avgSessionDuration || '0m 0s'}</span>
               </div>
-            </div>
+            </Card>
           </div>
 
-          {/* Top Pages & Low Stock Section */}
-          <div className="grid lg:grid-cols-2 gap-4">
-            {/* Top 5 Visited Pages */}
-            <div className="p-4 bg-white rounded-md border border-warm-200 shadow-xs">
-              <h2 className="font-bold text-warm-900 text-[13px] pb-2 border-b border-warm-100 mb-3">
-                Most Visited Pages (30 Days)
-              </h2>
+          {/* Top pages + low stock */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card title="Most visited pages (30 days)">
               {analytics?.topPages?.length > 0 ? (
-                <div className="divide-y divide-warm-100">
+                <ul className="divide-y divide-warm-100">
                   {analytics.topPages.map((page, idx) => (
-                    <div key={page.path} className="py-2 flex items-center justify-between text-[10px]">
-                      <div className="flex items-center gap-1.5 max-w-[75%]">
-                        <span className="w-4 h-4 rounded-full bg-warm-100 text-warm-700 font-bold flex items-center justify-center shrink-0">
+                    <li key={page.path} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-warm-100 text-xs font-bold text-warm-700">
                           {idx + 1}
                         </span>
-                        <span className="font-mono text-warm-800 truncate">{page.path}</span>
+                        <span className="truncate font-mono text-warm-800">{page.path}</span>
                       </div>
-                      <span className="font-semibold text-warm-900 bg-warm-50 px-2 py-0.5 rounded-md border border-warm-200/60">
-                        {page.views.toLocaleString()} views
-                      </span>
-                    </div>
+                      <Badge className="shrink-0 bg-warm-100 text-warm-800">
+                        {formatNumber(page.views)} views
+                      </Badge>
+                    </li>
                   ))}
-                </div>
+                </ul>
               ) : (
-                <p className="text-[10px] text-warm-400 py-4 text-center">No page views tracked yet.</p>
+                <p className="py-4 text-center text-sm text-warm-400">No page views tracked yet.</p>
               )}
-            </div>
+            </Card>
 
-            {/* Low Stock Alerts */}
-            <div className="p-4 bg-white rounded-md border border-warm-200 shadow-xs">
-              <div className="flex items-center justify-between mb-3 pb-2 border-b border-warm-100">
-                <h2 className="font-bold text-warm-900 text-[13px] flex items-center gap-1.5">
-                  <FiAlertTriangle className="w-3.5 h-3.5 text-amber-600" /> Low Stock Alerts (≤ 5)
-                </h2>
-                <Link
-                  href="/admin/products"
-                  className="text-[10px] text-brand-600 font-semibold hover:underline flex items-center gap-1"
-                >
-                  Manage Products <FiArrowRight className="w-3 h-3" />
-                </Link>
-              </div>
-
+            <Card
+              title={
+                <>
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  Low stock alerts (≤ 5)
+                </>
+              }
+              actions={
+                <Button href="/admin/products" variant="ghost" size="sm" className="text-brand-600">
+                  Manage products <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
+              }
+            >
               {stats?.lowStockProducts?.length > 0 ? (
-                <div className="space-y-2">
+                <ul className="space-y-2">
                   {stats.lowStockProducts.map((p) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center justify-between p-2 bg-amber-50/60 border border-amber-200/80 rounded-md text-[10px]"
+                    <li
+                      key={p._id || p.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm"
                     >
-                      <span className="font-semibold text-warm-900 truncate max-w-xs">{p.name}</span>
-                      <span className="px-2 py-0.5 bg-amber-100 text-amber-900 font-bold rounded-full shrink-0">
-                        {p.stock} remaining
-                      </span>
-                    </div>
+                      <span className="min-w-0 flex-1 truncate font-semibold text-warm-900">{p.name}</span>
+                      <Badge tone="warning" className="shrink-0">
+                        {p.stock} left
+                      </Badge>
+                    </li>
                   ))}
-                </div>
+                </ul>
               ) : (
-                <p className="text-[10px] text-warm-400 py-4 text-center">
-                  All active products have healthy inventory levels (&gt; 5 units).
+                <p className="py-4 text-center text-sm text-warm-400">
+                  All active products have healthy stock (&gt; 5 units).
                 </p>
               )}
-            </div>
+            </Card>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+// Sirf dashboard mein use hota hai
+function StatCard({ label, value, change, icon: Icon, tone }) {
+  const hasChange = typeof change === 'number';
+  const up = change >= 0;
+  const Trend = up ? TrendingUp : TrendingDown;
+
+  return (
+    <div className="rounded-xl border border-warm-200 bg-white p-5 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-wider text-warm-500">{label}</span>
+        <div className={cn('flex h-9 w-9 items-center justify-center rounded-lg border', TONES[tone])}>
+          <Icon className="h-4 w-4" />
+        </div>
+      </div>
+
+      <p className="text-2xl font-bold tracking-tight text-warm-900">{value}</p>
+
+      {hasChange && (
+        <p
+          className={cn(
+            'mt-1 inline-flex items-center gap-1 text-xs font-semibold',
+            up ? 'text-emerald-600' : 'text-rose-600'
+          )}
+        >
+          <Trend className="h-3.5 w-3.5" />
+          {Math.abs(change)}% vs prev 30d
+        </p>
       )}
     </div>
   );

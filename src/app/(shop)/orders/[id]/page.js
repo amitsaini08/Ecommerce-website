@@ -139,8 +139,9 @@ export default function OrderDetailPage() {
 
   async function handleRetryPayment() {
     setRetryingPayment(true);
+    const orderId = order._id || order.id;
     try {
-      const res = await fetch(`/api/payment/retry/${order.id}`, { method: 'POST' });
+      const res = await fetch(`/api/payment/retry/${orderId}`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok) {
         toast.error(data.error || 'Failed to start payment retry');
@@ -153,7 +154,7 @@ export default function OrderDetailPage() {
         amount: data.amount,
         currency: 'INR',
         name: 'NovaHub',
-        description: `Payment for Order #${order.id.slice(0, 8)}`,
+        description: `Payment for Order #${String(orderId).slice(0, 8)}`,
         order_id: data.razorpayOrderId,
         handler: async function (response) {
           try {
@@ -164,7 +165,7 @@ export default function OrderDetailPage() {
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
-                orderId: order.id,
+                orderId: orderId,
               }),
             });
             const verifyData = await verifyRes.json();
@@ -221,6 +222,7 @@ export default function OrderDetailPage() {
     );
   }
 
+  const orderId = order._id || order.id;
   const currentStepIndex = statusSteps.indexOf(order.status);
 
   const isInvoiceAvailable =
@@ -235,7 +237,7 @@ export default function OrderDetailPage() {
         items={[
           { label: 'Home', href: '/' },
           { label: 'My Orders', href: '/orders' },
-          { label: `Order #${order.id.slice(0, 8)}` },
+          { label: `Order #${String(orderId).slice(0, 8)}` },
         ]}
       />
 
@@ -243,7 +245,7 @@ export default function OrderDetailPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <h1 className="text-base font-bold text-warm-900 tracking-tight">
-            Order #{order.id.slice(0, 8)}
+            Order #{String(orderId).slice(0, 8)}
           </h1>
           <p className="text-[10px] text-warm-500 mt-0.5">
             Placed on {new Date(order.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
@@ -264,7 +266,7 @@ export default function OrderDetailPage() {
 
           {isInvoiceAvailable && (
             <Link
-              href={`/orders/${order.id}/invoice`}
+              href={`/orders/${orderId}/invoice`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-warm-200 text-warm-800 text-[11px] font-semibold rounded-md hover:bg-warm-50 transition-colors shadow-xs"
             >
               <FiPrinter className="w-3.5 h-3.5 text-warm-600" /> Printable Invoice
@@ -308,7 +310,7 @@ export default function OrderDetailPage() {
       {isPaymentEligibleForRetry && (
         <div className="p-3 bg-amber-50 border border-amber-200 rounded-md mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 className="font-bold text-amber-900 text-[11px]">Payment Pending for Order #{order.id.slice(0, 8)}</h3>
+            <h3 className="font-bold text-amber-900 text-[11px]">Payment Pending for Order #{String(orderId).slice(0, 8)}</h3>
             <p className="text-[10px] text-amber-700 mt-0.5">
               Your order is placed, but online payment is incomplete. Click &quot;Complete Payment&quot; below to finish paying via Razorpay.
             </p>
@@ -374,7 +376,7 @@ export default function OrderDetailPage() {
           <h2 className="text-[13px] font-bold text-warm-900 mb-3 pb-2 border-b border-warm-100">Ordered Items</h2>
           <div className="space-y-3">
             {items.map((item) => (
-              <div key={item.id} className="flex gap-3">
+              <div key={item._id || item.id} className="flex gap-3">
                 <div className="w-14 h-14 rounded-md overflow-hidden bg-warm-50 shrink-0 relative border border-warm-200">
                   {item.productImage?.[0] ? (
                     <Image src={item.productImage[0]} alt="" fill className="object-cover" sizes="56px" />
@@ -408,7 +410,7 @@ export default function OrderDetailPage() {
             <div className="space-y-2 text-[11px]">
               <div className="flex justify-between">
                 <span className="text-warm-500">Order ID</span>
-                <span className="text-warm-900 font-mono text-[10px]">{order.id.slice(0, 8)}</span>
+                <span className="text-warm-900 font-mono text-[10px]">{String(orderId).slice(0, 8)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-warm-500">Date</span>
@@ -470,7 +472,7 @@ export default function OrderDetailPage() {
               <h2 className="text-[13px] font-bold text-warm-900 mb-3 pb-2 border-b border-warm-100">Timeline</h2>
               <div className="space-y-3">
                 {history.map((h, i) => (
-                  <div key={h.id} className="flex gap-3">
+                  <div key={h._id || h.id} className="flex gap-3">
                     <div className="relative flex flex-col items-center">
                       <div className="w-2 h-2 rounded-full bg-warm-900 mt-1" />
                       {i < history.length - 1 && <div className="w-0.5 flex-1 bg-warm-200 mt-1" />}
@@ -492,7 +494,7 @@ export default function OrderDetailPage() {
       <Modal isOpen={showCancelModal} onClose={() => setShowCancelModal(false)} title="Cancel Order">
         <form onSubmit={handleCancelOrder} className="space-y-3">
           <p className="text-[11px] text-warm-600">
-            Are you sure you want to cancel Order #{order.id.slice(0, 8)}? Items will be returned to stock.
+            Are you sure you want to cancel Order #{String(orderId).slice(0, 8)}? Items will be returned to stock.
           </p>
           <div>
             <label className="block text-[10px] font-semibold text-warm-700 uppercase mb-1">
@@ -530,7 +532,7 @@ export default function OrderDetailPage() {
       <Modal isOpen={showReturnModal} onClose={() => setShowReturnModal(false)} title="Request Return / Refund">
         <form onSubmit={handleReturnOrder} className="space-y-3">
           <p className="text-[11px] text-warm-600">
-            Submit a return request for Order #{order.id.slice(0, 8)}. Our team will review your request.
+            Submit a return request for Order #{String(orderId).slice(0, 8)}. Our team will review your request.
           </p>
           <div>
             <label className="block text-[10px] font-semibold text-warm-700 uppercase mb-1">

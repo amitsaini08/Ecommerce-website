@@ -36,7 +36,8 @@ export function proxy(request) {
     const refreshPayload = verifyRefreshToken(refreshToken);
     if (refreshPayload) {
       decodedUser = {
-        id: refreshPayload.id,
+        id: refreshPayload._id || refreshPayload.id,
+        _id: refreshPayload._id || refreshPayload.id,
         email: refreshPayload.email,
         role: refreshPayload.role,
         name: refreshPayload.name,

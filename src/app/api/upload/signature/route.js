@@ -1,31 +1,24 @@
 import { NextResponse } from 'next/server';
-import { getAuthUser } from '@/lib/auth';
 import crypto from 'crypto';
+import { routeHandler, AppError } from '@/app/api/routeHandler';
 
-export async function POST(request) {
-  try {
-    const user = await getAuthUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { uploadType } = await request.json();
+export const POST = routeHandler({
+  auth: true,
+  roles: ['customer', 'admin'],
+  handler: async (request, { user }) => {
+    const { uploadType } = await request.json().catch(() => ({}));
 
     let folder = 'reviews';
     if (uploadType === 'product-image') {
-      if (user.role !== 'admin') {
-        return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
-      }
+      if (user.role !== 'admin') throw new AppError('Forbidden: Admin access required', 403);
       folder = 'products';
     } else if (uploadType === 'category-image') {
-      if (user.role !== 'admin') {
-        return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
-      }
+      if (user.role !== 'admin') throw new AppError('Forbidden: Admin access required', 403);
       folder = 'categories';
     } else if (uploadType === 'review-media') {
       folder = 'reviews';
     } else {
-      return NextResponse.json({ error: 'Invalid upload type' }, { status: 400 });
+      throw new AppError('Invalid upload type', 400);
     }
 
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
@@ -33,11 +26,10 @@ export async function POST(request) {
     const apiSecret = process.env.CLOUDINARY_API_SECRET;
 
     if (!cloudName || !apiKey || !apiSecret) {
-      return NextResponse.json({ error: 'Cloudinary configuration missing on server' }, { status: 500 });
+      throw new AppError('Cloudinary configuration missing on server', 500);
     }
 
     const timestamp = Math.floor(Date.now() / 1000);
-    // Cloudinary signature requires parameters sorted alphabetically: folder=...&timestamp=...
     const paramsToSign = `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
     const signature = crypto.createHash('sha1').update(paramsToSign).digest('hex');
 
@@ -48,8 +40,5 @@ export async function POST(request) {
       apiKey,
       cloudName,
     });
-  } catch (error) {
-    console.error('Signature generation error:', error);
-    return NextResponse.json({ error: 'Failed to generate upload signature' }, { status: 500 });
-  }
-}
+  },
+});

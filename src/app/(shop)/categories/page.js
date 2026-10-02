@@ -2,6 +2,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { connectToDatabase, Category } from '@/lib/db/models';
 import { ArrowRight, Folder } from 'lucide-react';
+import Section from '@/components/ui/Section';
+import PageHeader from '@/components/ui/PageHeader';
+import EmptyState from '@/components/ui/EmptyState';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,14 +18,17 @@ export default async function CategoriesPage() {
   try {
     await connectToDatabase();
     allCategories = await Category.find().sort({ name: 1 }).lean();
-  } catch {}
+  } catch { }
 
   const rootCategories = allCategories.filter((c) => !c.parentIds || c.parentIds.length === 0);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <h1 className="text-base font-bold text-warm-900 tracking-tight mb-0.5">All Categories</h1>
-      <p className="text-warm-500 text-[11px] mb-5">Browse our curated collection</p>
+    <Section padding="lg" className="bg-warm-50">
+      <PageHeader
+        title="All Categories"
+        subtitle="Browse our curated collection of product categories."
+        className="mb-6"
+      />
 
       {rootCategories.length > 0 ? (
         <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -34,9 +40,7 @@ export default async function CategoriesPage() {
             >
               {cat.imageUrl ? (
                 <Image
-                  src={cat.imageUrl}
-                  alt={cat.name}
-                  fill
+                  src={cat.imageUrl} alt={cat.name} fill
                   className="object-cover group-hover:scale-110 transition-transform duration-500"
                   sizes="(max-width: 640px) 33vw, 16vw"
                 />
@@ -56,11 +60,15 @@ export default async function CategoriesPage() {
           ))}
         </div>
       ) : (
-        <div className="text-center py-12 text-warm-400">
-          <Folder className="w-8 h-8 mx-auto text-warm-300 mb-2" />
-          <p className="text-sm">No categories yet. Check back soon!</p>
-        </div>
+        <>
+          <EmptyState
+            icon={Folder}
+            title="No categories yet. Check back soon!"
+            description="We are working hard to add more categories to our store. Stay tuned for updates!"
+            className="bg-transparent  h-60 flex items-center justify-center flex-col gap-1"
+          />
+        </>
       )}
-    </div>
+    </Section>
   );
 }

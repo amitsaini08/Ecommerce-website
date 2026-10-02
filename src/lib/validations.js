@@ -75,11 +75,13 @@ export const productSchema = z.object({
   description: z.string().trim().optional().nullable(),
   price: z.number().positive('Price must be greater than 0'),
   discountPrice: z.number().positive('Discount price must be greater than 0').optional().nullable(),
-  categoryId: z.string().optional().nullable(),
+  categoryIds: z.array(z.string()).default([]),
   stock: z.number().int().min(0, 'Stock cannot be negative'),
-  images: z.array(z.string().url()).default([]),
+  images: z.array(z.string().url ()).default([]),
   isActive: z.boolean().default(true),
   codAvailable: z.boolean().default(true),
+  productLink: z.string().optional().nullable().or(z.literal('')),
+  specifications: z.array(z.object({ name: z.string(), value: z.string() })).default([]),
 });
 
 export const categorySchema = z.object({
@@ -148,4 +150,15 @@ export const contactSchema = z.object({
   email: emailRule,
   subject: z.string().trim().min(2, 'Subject must be at least 2 characters').max(255),
   message: z.string().trim().min(5, 'Message must be at least 5 characters').max(5000),
+});
+
+
+export const bannerSchema = z.object({
+  title: z.string().trim().min(1, 'Banner title is required'),
+  subtitle: z.string().trim().optional().nullable(),
+  imageUrl: z.string().trim().optional().nullable(),
+  bgColor: z.string().trim().optional(),
+  linkUrl: z.string().trim().optional().nullable(),
+  isActive: z.boolean().optional().default(true),
+  sortOrder: z.coerce.number().optional().default(0),
 });

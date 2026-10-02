@@ -688,7 +688,7 @@ export default function ProfilePage() {
               </p>
             ) : (
               addresses.map((addr) => (
-                <div key={addr.id || addr._id} className="p-3.5 bg-white rounded-md border border-warm-200 shadow-xs text-[11px] space-y-1">
+                <div key={addr._id || addr.id} className="p-3.5 bg-white rounded-md border border-warm-200 shadow-xs text-[11px] space-y-1">
                   {addr.label && (
                     <span className="text-[10px] font-bold text-warm-900 uppercase tracking-wider block mb-1">
                       {addr.label}

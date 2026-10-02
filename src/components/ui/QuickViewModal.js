@@ -24,8 +24,9 @@ export default function QuickViewModal({ product, isOpen, onClose }) {
   const [selectedImgIndex, setSelectedImgIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
 
+  const productId = product?._id || product?.id;
   const isWishlisted = useSelector(
-    (state) => product?.id ? selectIsWishlisted(product.id)(state) : false
+    (state) => productId ? selectIsWishlisted(productId)(state) : false
   );
 
   useEffect(() => {
@@ -47,7 +48,6 @@ export default function QuickViewModal({ product, isOpen, onClose }) {
   if (!isOpen || !product) return null;
 
   const {
-    id,
     name,
     slug,
     price,
@@ -68,7 +68,7 @@ export default function QuickViewModal({ product, isOpen, onClose }) {
   const handleAddToCart = () => {
     dispatch(
       addItem({
-        productId: id,
+        productId,
         name,
         slug,
         image: images[0] || '',
@@ -84,11 +84,11 @@ export default function QuickViewModal({ product, isOpen, onClose }) {
 
   const handleToggleWishlist = async () => {
     if (isWishlisted) {
-      dispatch(removeFromWishlist(id));
+      dispatch(removeFromWishlist(productId));
       toast.info('Removed from wishlist');
       if (user) {
         try {
-          await fetch(`/api/wishlist/${id}`, { method: 'DELETE' });
+          await fetch(`/api/wishlist/${productId}`, { method: 'DELETE' });
         } catch {}
       }
     } else {
@@ -99,7 +99,7 @@ export default function QuickViewModal({ product, isOpen, onClose }) {
           await fetch('/api/wishlist', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ productId: id }),
+            body: JSON.stringify({ productId }),
           });
         } catch {}
       }
@@ -115,7 +115,6 @@ export default function QuickViewModal({ product, isOpen, onClose }) {
       />
 
       <div className="relative w-full max-w-3xl bg-white rounded-md shadow-2xl overflow-hidden z-10 flex flex-col max-h-[80vh]">
-        {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-2 text-warm-400 hover:text-warm-900 rounded-full hover:bg-warm-100 transition-colors z-20"
@@ -126,7 +125,6 @@ export default function QuickViewModal({ product, isOpen, onClose }) {
 
         <div className="overflow-y-auto p-6 sm:p-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 items-start">
-            {/* Image Gallery */}
             <div className="space-y-3">
               <div className="relative aspect-square rounded-md bg-warm-50 border border-warm-200 overflow-hidden">
                 {mainImage ? (
@@ -150,7 +148,6 @@ export default function QuickViewModal({ product, isOpen, onClose }) {
                 )}
               </div>
 
-              {/* Thumbnails */}
               {images.length > 1 && (
                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
                   {images.map((img, idx) => (
@@ -170,7 +167,6 @@ export default function QuickViewModal({ product, isOpen, onClose }) {
               )}
             </div>
 
-            {/* Product Details */}
             <div className="flex flex-col justify-between space-y-4">
               <div>
                 <h2 className="text-md font-bold text-warm-900 tracking-tight mb-2">
@@ -201,7 +197,6 @@ export default function QuickViewModal({ product, isOpen, onClose }) {
                 </p>
               </div>
 
-              {/* Action Buttons & Quantity */}
               <div className="space-y-4 pt-4 border-t border-warm-100">
                 <div className="flex items-center gap-4">
                   <span className="text-[11px] font-bold text-warm-700 uppercase tracking-wider">

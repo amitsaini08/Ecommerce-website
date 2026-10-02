@@ -1,39 +1,29 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase, Order, Product, User } from '@/lib/db/models';
-import { getAuthUser } from '@/lib/auth';
+import { Order, Product, User } from '@/lib/db/models';
+import { routeHandler, AppError } from '@/app/api/routeHandler';
+import { sameId } from '@/lib/reviews';
 
-export async function GET(request, { params }) {
-  try {
-    const authUser = await getAuthUser(request);
+export const GET = routeHandler({
+  auth: true,
+  handler: async (request, { user, params }) => {
     const { id } = await params;
-
-    await connectToDatabase();
     const order = await Order.findById(id).lean();
 
-    if (!order) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    if (!order) throw new AppError('Order not found', 404);
+
+    if (order.userId && !sameId(user._id, order.userId) && user.role !== 'admin') {
+      throw new AppError('Order not found', 404);
     }
 
-    // Allow owner or admin or guest with valid session
-    if (order.userId) {
-      if (!authUser || (authUser.id !== order.userId && authUser.role !== 'admin')) {
-        return NextResponse.json({ error: 'Order not found' }, { status: 404 });
-      }
-    }
-
-    // Populate product details for items
     const productIds = (order.items || []).map((i) => i.productId);
     const productsList = await Product.find({ _id: { $in: productIds } }).lean();
-    const productMap = {};
-    productsList.forEach((p) => {
-      productMap[p._id] = p;
-    });
+    const productMap = new Map(productsList.map((p) => [String(p._id), p]));
 
     const items = (order.items || []).map((item) => {
-      const prod = productMap[item.productId];
+      const prod = productMap.get(String(item.productId));
       return {
-        id: item._id,
-        productId: item.productId,
+        _id: String(item._id),
+        productId: String(item.productId),
         quantity: item.quantity,
         priceAtPurchase: item.priceAtPurchase,
         addons: item.addons || [],
@@ -43,24 +33,20 @@ export async function GET(request, { params }) {
       };
     });
 
-    // Get user address if addressId is set and no direct shippingAddress snapshot exists
     let address = order.shippingAddress || null;
     if (!address && order.addressId && order.userId) {
       const dbUser = await User.findById(order.userId).lean();
       if (dbUser && dbUser.addresses) {
-        address = dbUser.addresses.find((a) => a._id === order.addressId) || null;
+        address = dbUser.addresses.find((a) => sameId(a._id, order.addressId)) || null;
       }
     }
 
     return NextResponse.json({
-      order: { ...order, id: order._id },
+      order: { ...order, id: String(order._id) },
       items,
-      history: (order.statusHistory || []).map((h) => ({ ...h, id: h._id })),
-      trackingEvents: (order.shipmentTrackingEvents || []).map((t) => ({ ...t, id: t._id })),
+      history: order.statusHistory || [],
+      trackingEvents: order.shipmentTrackingEvents || [],
       address,
     });
-  } catch (error) {
-    console.error('Fetch order detail error:', error);
-    return NextResponse.json({ error: 'Failed to fetch order' }, { status: 500 });
-  }
-}
+  },
+});

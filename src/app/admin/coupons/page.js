@@ -39,7 +39,7 @@ export default function AdminCouponsPage() {
   }
 
   function startEdit(c) {
-    setEditingId(c.id);
+    setEditingId(c._id || c.id);
     setForm({
       code: c.code,
       type: c.type,
@@ -290,50 +290,53 @@ export default function AdminCouponsPage() {
                 </td>
               </tr>
             ) : (
-              coupons.map((c) => (
-                <tr key={c.id} className="hover:bg-warm-50/50 transition-colors">
-                  <td className="px-3 py-2 font-mono font-bold text-warm-900">{c.code}</td>
-                  <td className="px-3 py-2 text-warm-600 capitalize">{c.type}</td>
-                  <td className="px-3 py-2 font-semibold text-warm-900">
-                    {c.type === 'percent' ? `${c.value}%` : formatCurrency(c.value)}
-                  </td>
-                  <td className="px-3 py-2 text-warm-500">
-                    {c.minOrderAmount ? formatCurrency(c.minOrderAmount) : '—'}
-                  </td>
-                  <td className="px-3 py-2 text-warm-500">
-                    {c.expiresAt ? new Date(c.expiresAt).toLocaleDateString() : 'Never'}
-                  </td>
-                  <td className="px-3 py-2">
-                    {c.isActive ? (
-                      <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-semibold rounded-md border border-emerald-200">
-                        Active
-                      </span>
-                    ) : (
-                      <span className="px-1.5 py-0.5 bg-warm-100 text-warm-500 text-[10px] font-medium rounded-md">
-                        Inactive
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => startEdit(c)}
-                        className="p-1 text-warm-500 hover:text-brand-600 hover:bg-brand-50 rounded-md transition-colors"
-                        title="Edit coupon"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(c.id)}
-                        className="p-1 text-warm-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                        title="Delete coupon"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+              coupons.map((c) => {
+                const couponId = c._id || c.id;
+                return (
+                  <tr key={couponId} className="hover:bg-warm-50/50 transition-colors">
+                    <td className="px-3 py-2 font-mono font-bold text-warm-900">{c.code}</td>
+                    <td className="px-3 py-2 text-warm-600 capitalize">{c.type}</td>
+                    <td className="px-3 py-2 font-semibold text-warm-900">
+                      {c.type === 'percent' ? `${c.value}%` : formatCurrency(c.value)}
+                    </td>
+                    <td className="px-3 py-2 text-warm-500">
+                      {c.minOrderAmount ? formatCurrency(c.minOrderAmount) : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-warm-500">
+                      {c.expiresAt ? new Date(c.expiresAt).toLocaleDateString() : 'Never'}
+                    </td>
+                    <td className="px-3 py-2">
+                      {c.isActive ? (
+                        <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-semibold rounded-md border border-emerald-200">
+                          Active
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 bg-warm-100 text-warm-500 text-[10px] font-medium rounded-md">
+                          Inactive
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => startEdit(c)}
+                          className="p-1 text-warm-500 hover:text-brand-600 hover:bg-brand-50 rounded-md transition-colors"
+                          title="Edit coupon"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(couponId)}
+                          className="p-1 text-warm-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                          title="Delete coupon"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

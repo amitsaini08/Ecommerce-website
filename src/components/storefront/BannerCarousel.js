@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
+import { cn } from '@/lib/cn';
+import Section from '@/components/ui/Section';
+import Button from '@/components/ui/Button';
 
 export default function BannerCarousel() {
   const [banners, setBanners] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const timerRef = useRef(null);
 
   useEffect(() => {
     async function fetchActiveBanners() {
@@ -26,98 +27,76 @@ export default function BannerCarousel() {
 
   useEffect(() => {
     if (banners.length <= 1 || isPaused) return;
-
-    timerRef.current = setInterval(() => {
+    const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % banners.length);
     }, 5000);
-
-    return () => clearInterval(timerRef.current);
+    return () => clearInterval(timer);
   }, [banners.length, isPaused]);
 
-  if (!banners || banners.length === 0) return null;
+  if (!banners.length) return null;
 
-  const currentBanner = banners[currentIndex];
+  const banner = banners[currentIndex];
+  const prev = () => setCurrentIndex((i) => (i - 1 + banners.length) % banners.length);
+  const next = () => setCurrentIndex((i) => (i + 1) % banners.length);
 
   return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-2">
+    <Section padding="sm">
       <div
-        className="relative rounded-xl overflow-hidden shadow-sm transition-all duration-500 min-h-[160px] sm:min-h-[220px] lg:min-h-[260px] flex items-center"
-        style={{ backgroundColor: currentBanner.bgColor || '#18181b' }}
+        className="relative flex min-h-[180px] items-center overflow-hidden rounded-xl shadow-sm transition-colors duration-500 sm:min-h-[240px] lg:min-h-[280px]"
+        style={{ backgroundColor: banner.bgColor || '#18181b' }}
         onMouseEnter={() => setIsPaused(true)}
-        onMouseLeave={() => setIsPaused(false)}
-      >
-        {/* Background Image if present */}
-        {currentBanner.imageUrl && (
+        onMouseLeave={() => setIsPaused(false)}>
+        {banner.imageUrl && (
           <div className="absolute inset-0 z-0">
-            <Image
-              src={currentBanner.imageUrl}
-              alt={currentBanner.title}
-              fill
-              className="object-cover opacity-35"
-              sizes="1280px"
-              priority
-            />
+            <Image src={banner.imageUrl} alt={banner.title} fill className="object-cover opacity-35" sizes="1280px" priority />
             <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
           </div>
         )}
 
-        {/* Content Container */}
-        <div className="relative z-10 p-6 sm:p-10 max-w-xl text-white space-y-2">
-          <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight leading-tight">
-            {currentBanner.title}
+        <div className="relative z-10 max-w-xl space-y-2 p-6 text-white sm:p-10">
+          <h2 className="text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl lg:text-4xl">
+            {banner.title}
           </h2>
-          {currentBanner.subtitle && (
-            <p className="text-xs sm:text-sm text-warm-200 line-clamp-2 leading-relaxed">
-              {currentBanner.subtitle}
-            </p>
+          {banner.subtitle && (
+            <p className="line-clamp-2 text-sm leading-relaxed text-warm-200">{banner.subtitle}</p>
           )}
-          {currentBanner.linkUrl && (
+          {banner.linkUrl && (
             <div className="pt-2">
-              <Link
-                href={currentBanner.linkUrl}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-white text-warm-900 text-xs font-bold rounded-lg hover:bg-warm-100 transition-colors shadow-xs"
-              >
+              <Button href={banner.linkUrl} variant="light">
                 <span>Shop Now</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+                <ArrowRight className="h-4 w-4" />
+              </Button>
             </div>
           )}
         </div>
 
-        {/* Navigation Arrows */}
         {banners.length > 1 && (
           <>
-            <button
-              onClick={() => setCurrentIndex((prev) => (prev - 1 + banners.length) % banners.length)}
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center backdrop-blur-xs transition-colors z-20"
-              aria-label="Previous slide"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setCurrentIndex((prev) => (prev + 1) % banners.length)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center backdrop-blur-xs transition-colors z-20"
-              aria-label="Next slide"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
+            {[
+              { onClick: prev, label: 'Previous slide', side: 'left-3', Icon: ChevronLeft },
+              { onClick: next, label: 'Next slide', side: 'right-3', Icon: ChevronRight },
+            ].map(({ onClick, label, side, Icon }) => (
+              <button  key={label} type="button"  onClick={onClick} aria-label={label}
+                className={cn('absolute top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full',
+                  'bg-black/40 text-white backdrop-blur-xs transition-colors hover:bg-black/60',
+                  side
+                )}
+              >
+                <Icon className="h-5 w-5" />
+              </button>
+            ))}
 
-            {/* Dots */}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-20">
+            <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5">
               {banners.map((_, i) => (
                 <button
-                  key={i}
-                  onClick={() => setCurrentIndex(i)}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    currentIndex === i ? 'w-5 bg-white' : 'bg-white/50 hover:bg-white/80'
-                  }`}
-                  aria-label={`Go to slide ${i + 1}`}
+                  key={i} type="button" onClick={() => setCurrentIndex(i)}  aria-label={`Go to slide ${i + 1}`}
+                  className={cn(  'h-2 rounded-full transition-all', currentIndex === i ? 'w-5 bg-white' : 'w-2 bg-white/50 hover:bg-white/80' )}
                 />
               ))}
             </div>
           </>
         )}
       </div>
-    </section>
+    </Section>
   );
 }

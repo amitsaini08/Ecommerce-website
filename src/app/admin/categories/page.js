@@ -60,7 +60,7 @@ export default function AdminCategoriesPage() {
       .then((d) =>
         setParentNameCache((prev) => {
           const next = { ...prev };
-          (d.categories || []).forEach((c) => { next[c.id] = c.name; });
+          (d.categories || []).forEach((c) => { next[c._id || c.id] = c.name; });
           return next;
         })
       )
@@ -157,14 +157,15 @@ export default function AdminCategoriesPage() {
   }
 
   function renderCategoryRow(c, depth, pathPrefix = 'root', visitedAncestors = new Set()) {
-    const rowKey = `${pathPrefix}-${c.id}`;
-    const children = getChildren(c.id);
+    const catId = c._id || c.id;
+    const rowKey = `${pathPrefix}-${catId}`;
+    const children = getChildren(catId);
     const parentNames = getParentNames(c);
     const isExpanded = expandedIds.has(rowKey);
 
-    const isCircular = visitedAncestors.has(c.id);
+    const isCircular = visitedAncestors.has(catId);
     const isMaxDepthExceeded = depth >= 10;
-    const isLevelLoading = childrenCache[c.id]?.loading;
+    const isLevelLoading = childrenCache[catId]?.loading;
 
     return (
       <Fragment key={rowKey}>
@@ -174,7 +175,7 @@ export default function AdminCategoriesPage() {
               {c.hasChildren && !isCircular && !isMaxDepthExceeded ? (
                 <button
                   type="button"
-                  onClick={() => toggleExpand(rowKey, c.id)}
+                  onClick={() => toggleExpand(rowKey, catId)}
                   disabled={isLevelLoading}
                   className="p-0.5 text-warm-400 hover:text-warm-900 shrink-0"
                 >
@@ -242,7 +243,7 @@ export default function AdminCategoriesPage() {
                 <Edit2 className="w-3.5 h-3.5" />
               </button>
               <button
-                onClick={() => handleDelete(c.id, c.name)}
+                onClick={() => handleDelete(catId, c.name)}
                 className="p-1 text-warm-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                 title="Delete category"
               >
@@ -261,18 +262,18 @@ export default function AdminCategoriesPage() {
               </>
             ) : (
               children.map((child) =>
-                renderCategoryRow(child, depth + 1, rowKey, new Set([...visitedAncestors, c.id]))
+                renderCategoryRow(child, depth + 1, rowKey, new Set([...visitedAncestors, catId]))
               )
             )}
-            {childrenCache[c.id]?.loadingMore ? (
+            {childrenCache[catId]?.loadingMore ? (
               <SkeletonRow depth={depth + 1} />
             ) : (
-              childrenCache[c.id]?.nextCursor && (
+              childrenCache[catId]?.nextCursor && (
                 <tr>
                   <td colSpan={4} style={{ paddingLeft: (depth + 1) * 20 + 12 }} className="py-1.5">
                     <button
                       type="button"
-                      onClick={() => fetchLevel(c.id, { cursor: childrenCache[c.id].nextCursor, append: true })}
+                      onClick={() => fetchLevel(catId, { cursor: childrenCache[catId].nextCursor, append: true })}
                       className="text-[11px] font-semibold text-brand-600 hover:underline"
                     >
                       Load more...
@@ -379,7 +380,7 @@ function SkeletonRow({ depth = 0 }) {
 
 function CategoryCreateEditForm({ category, onClose, onSaved }) {
   const toast = useToast();
-  const editingId = category?.id || null;
+  const editingId = category?._id || category?.id || null;
 
   const [form, setForm] = useState({
     imageUrl: category?.imageUrl || '',

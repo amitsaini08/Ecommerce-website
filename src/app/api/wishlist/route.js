@@ -1,68 +1,48 @@
 import { NextResponse } from 'next/server';
-import { getAuthUser } from '@/lib/auth';
-import { connectToDatabase, User, Product } from '@/lib/db/models';
+import { User, Product } from '@/lib/db/models';
+import { routeHandler, AppError } from '@/app/api/routeHandler';
 
-export async function GET(req) {
-  try {
-    const authUser = await getAuthUser(req);
-    if (!authUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    await connectToDatabase();
-    const user = await User.findById(authUser.id).lean();
-
+export const GET = routeHandler({
+  auth: true,
+  handler: async (request, { user }) => {
     if (!user || !user.wishlist || user.wishlist.length === 0) {
       return NextResponse.json({ items: [] });
     }
 
     const productsList = await Product.find({ _id: { $in: user.wishlist } }).lean();
-
     const items = productsList.map((p) => {
       const { productLink, ...rest } = p;
-      return {
-        ...rest,
-        id: p._id,
-      };
+      return { ...rest, id: String(p._id) };
     });
 
     return NextResponse.json({ items });
-  } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
+  },
+});
 
-export async function POST(req) {
-  try {
-    const authUser = await getAuthUser(req);
-    if (!authUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const body = await req.json();
+export const POST = routeHandler({
+  auth: true,
+  roles: ['customer', 'admin'],
+  handler: async (request, { user }) => {
+    const body = await request.json().catch(() => ({}));
     const { productId, productIds } = body;
-
-    await connectToDatabase();
 
     if (productId) {
       await User.updateOne(
-        { _id: authUser.id },
-        { $addToSet: { wishlist: productId } }
+        { _id: user._id },
+        { $addToSet: { wishlist: String(productId) } }
       );
       return NextResponse.json({ success: true });
     }
 
     if (Array.isArray(productIds) && productIds.length > 0) {
-      const cleanIds = productIds.filter(Boolean);
+      const cleanIds = productIds.filter(Boolean).map((id) => String(id));
       await User.updateOne(
-        { _id: authUser.id },
+        { _id: user._id },
         { $addToSet: { wishlist: { $each: cleanIds } } }
       );
       return NextResponse.json({ success: true, count: cleanIds.length });
     }
 
-    return NextResponse.json({ error: 'Missing productId or productIds' }, { status: 400 });
-  } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
+    throw new AppError('Missing productId or productIds', 400);
+  },
+});

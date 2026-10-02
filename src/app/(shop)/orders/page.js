@@ -66,27 +66,30 @@ export default function OrdersPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {orders.map((order) => (
-            <Link
-              key={order.id}
-              href={`/orders/${order.id}`}
-              className="block p-5 bg-white rounded-xl border border-warm-200 hover:border-warm-300 hover:shadow-xs transition-all"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-mono text-warm-500 mb-1">Order #{order.id.slice(0, 8)}</p>
-                  <p className="text-base font-bold text-warm-900">{formatCurrency(order.totalAmount)}</p>
-                  <p className="text-xs text-warm-500 mt-1">{new Date(order.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          {orders.map((order) => {
+            const orderId = order._id || order.id;
+            return (
+              <Link
+                key={orderId}
+                href={`/orders/${orderId}`}
+                className="block p-5 bg-white rounded-xl border border-warm-200 hover:border-warm-300 hover:shadow-xs transition-all"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-mono text-warm-500 mb-1">Order #{String(orderId).slice(0, 8)}</p>
+                    <p className="text-base font-bold text-warm-900">{formatCurrency(order.totalAmount)}</p>
+                    <p className="text-xs text-warm-500 mt-1">{new Date(order.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`px-3 py-1 text-xs font-semibold rounded-full capitalize ${statusColors[order.status] || 'bg-warm-100 text-warm-600'}`}>
+                      {order.status}
+                    </span>
+                    <FiChevronRight className="w-4 h-4 text-warm-400" />
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className={`px-3 py-1 text-xs font-semibold rounded-full capitalize ${statusColors[order.status] || 'bg-warm-100 text-warm-600'}`}>
-                    {order.status}
-                  </span>
-                  <FiChevronRight className="w-4 h-4 text-warm-400" />
-                </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase, Order, User } from '@/lib/db/models';
 import { requireAdmin } from '@/lib/auth';
+import { routeHandler } from '../../routeHandler';
 
-export async function GET(request) {
-  try {
-    await requireAdmin(request);
+
+export const GET = routeHandler({
+  auth: true,
+  roles: ['admin'],
+  handler: async (request) => {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
@@ -18,9 +21,9 @@ export async function GET(request) {
     const maxAmount = searchParams.get('maxAmount');
     const offset = (page - 1) * limit;
 
-    await connectToDatabase();
+  
 
-    // --- Base match (filters that apply directly to Order fields) ---
+  
     const baseMatch = {};
 
     if (status === 'payment_pending') { baseMatch.paymentStatus = 'pending'; }
@@ -43,7 +46,7 @@ export async function GET(request) {
       if (minAmount) baseMatch.totalAmount.$gte = parseFloat(minAmount);
       if (maxAmount) baseMatch.totalAmount.$lte = parseFloat(maxAmount);
     }
-    
+
     const pipeline = [
       { $match: baseMatch },
       {
@@ -94,7 +97,7 @@ export async function GET(request) {
     const count = result?.totalCount?.[0]?.count || 0;
 
     const ordersFormatted = list.map((o) => ({
-      id: o._id,
+      _id: o._id,
       status: o.status,
       paymentStatus: o.paymentStatus,
       paymentMethod: o.paymentMethod,
@@ -110,9 +113,5 @@ export async function GET(request) {
       orders: ordersFormatted,
       pagination: { page, limit, total: count, totalPages: Math.ceil(count / limit) },
     });
-  } catch (error) {
-    if (error.message === 'Unauthorized' || error.message === 'Forbidden')
-      return NextResponse.json({ error: error.message }, { status: 403 });
-    return NextResponse.json({ error: 'Failed' }, { status: 500 });
-  }
-}
+  },
+})

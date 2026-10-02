@@ -1,30 +1,25 @@
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
-import { connectToDatabase, Order, Product, User } from '@/lib/db/models';
-import { requireAdmin } from '@/lib/auth';
+import { Order, Product, User } from '@/lib/db/models';
 import { adminOrderActionSchema } from '@/lib/validations';
-import { parseAndValidate } from '@/lib/sanitization';
+import { routeHandler, AppError } from '@/app/api/routeHandler';
+import { sameId } from '@/lib/reviews';
 
-export async function GET(request, { params }) {
-  try {
-    await requireAdmin(request);
+export const GET = routeHandler({
+  auth: true,
+  roles: ['admin'],
+  handler: async (request, { params }) => {
     const { id } = await params;
-
-    await connectToDatabase();
     const order = await Order.findById(id).lean();
-    if (!order) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (!order) throw new AppError('Order not found', 404);
 
     const productIds = (order.items || []).map((i) => i.productId);
     const productsList = await Product.find({ _id: { $in: productIds } }).lean();
-    const productMap = {};
-    productsList.forEach((p) => {
-      productMap[p._id] = p;
-    });
+    const productMap = new Map(productsList.map((p) => [String(p._id), p]));
 
     const items = (order.items || []).map((item) => {
-      const p = productMap[item.productId];
+      const p = productMap.get(String(item.productId));
       return {
-        id: item._id,
+        _id: String(item._id),
         quantity: item.quantity,
         priceAtPurchase: item.priceAtPurchase,
         productName: p?.name || 'Product',
@@ -34,8 +29,7 @@ export async function GET(request, { params }) {
       };
     });
 
-    const history = (order.statusHistory || []).map((h) => ({ ...h, id: h._id }));
-
+    const history = order.statusHistory || [];
     let address = order.shippingAddress || null;
     let customer = null;
 
@@ -44,7 +38,7 @@ export async function GET(request, { params }) {
       if (u) {
         customer = { name: u.name, email: u.email, phone: u.phone };
         if (!address && u.addresses) {
-          address = u.addresses.find((a) => a._id === order.addressId) || null;
+          address = u.addresses.find((a) => sameId(a._id, order.addressId)) || null;
         }
       }
     } else {
@@ -52,55 +46,36 @@ export async function GET(request, { params }) {
     }
 
     return NextResponse.json({
-      order: { ...order, id: order._id },
+      order,
       items,
       history,
       address,
       customer,
     });
-  } catch (error) {
-    if (error.message === 'Unauthorized' || error.message === 'Forbidden')
-      return NextResponse.json({ error: error.message }, { status: 403 });
-    return NextResponse.json({ error: 'Failed' }, { status: 500 });
-  }
-}
+  },
+});
 
-export async function PATCH(request, { params }) {
-  try {
-    await requireAdmin(request);
+export const PATCH = routeHandler({
+  auth: true,
+  roles: ['admin'],
+  schema: adminOrderActionSchema,
+  handler: async (request, { params, data }) => {
     const { id } = await params;
-    const rawBody = await request.json().catch(() => ({}));
+    const { status, reason, paymentStatus, action } = data;
 
-    // Support legacy { status, note } as well as adminOrderActionSchema
-    const status = rawBody.status ? String(rawBody.status).trim() : null;
-    const note = rawBody.note ? String(rawBody.note).trim() : null;
-    const action = rawBody.action ? String(rawBody.action).trim() : 'update_status';
-
-    if (!status && !action) {
-      return NextResponse.json({ error: 'Status or action required' }, { status: 400 });
-    }
-
-    await connectToDatabase();
     const order = await Order.findById(id);
-    if (!order) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (!order) throw new AppError('Order not found', 404);
 
-    if (status) {
-      order.status = status;
-    }
+    if (status) order.status = status;
+    if (paymentStatus) order.paymentStatus = paymentStatus;
 
     order.statusHistory.push({
-      _id: crypto.randomUUID(),
       status: order.status,
-      note: note || `Updated via admin panel (${action})`,
+      note: reason || `Updated via admin panel (${action})`,
       changedAt: new Date(),
     });
 
     await order.save();
-
-    return NextResponse.json({ order: { ...order.toObject(), id: order._id } });
-  } catch (error) {
-    if (error.message === 'Unauthorized' || error.message === 'Forbidden')
-      return NextResponse.json({ error: error.message }, { status: 403 });
-    return NextResponse.json({ error: 'Failed' }, { status: 500 });
-  }
-}
+    return NextResponse.json({ order: order.toObject() });
+  },
+});

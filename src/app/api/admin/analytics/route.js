@@ -1,16 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getAuthUser } from '@/lib/auth';
-import { connectToDatabase, PageView, Order } from '@/lib/db/models';
+import {  PageView, Order } from '@/lib/db/models';
+import { routeHandler } from '../../routeHandler';
 
-export async function GET(req) {
-  try {
-    const auth = await getAuthUser(req);
-    if (!auth || auth.role !== 'admin') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
-    await connectToDatabase();
-
+export const GET = routeHandler({
+  auth: true,
+  roles: ['admin'],
+  handler: async () => {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
@@ -121,7 +117,5 @@ export async function GET(req) {
       topPages: topPagesRes.map((p) => ({ path: p._id, views: Number(p.views) })),
       deviceBreakdown,
     });
-  } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
-  }
-}
+  },
+});

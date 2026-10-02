@@ -94,72 +94,75 @@ export default function AdminReviewsPage() {
                 </td>
               </tr>
             ) : (
-              reviews.map((r) => (
-                <tr key={r.id} className={`hover:bg-warm-50/50 transition-colors ${r.isHidden ? 'opacity-50 bg-warm-50/30' : ''}`}>
-                  <td className="px-3 py-2 font-semibold text-warm-900 max-w-[140px] truncate">
-                    {r.productName || '—'}
-                  </td>
-                  <td className="px-3 py-2 text-warm-600">
-                    <p className="font-medium text-warm-900">{r.userName || 'Customer'}</p>
-                    <p className="text-[9px] text-warm-400">{r.userEmail}</p>
-                  </td>
-                  <td className="px-3 py-2">
-                    <StarRating rating={r.rating} size="xs" />
-                  </td>
-                  <td className="px-3 py-2 max-w-[240px]">
-                    {r.comment && <p className="text-warm-700 line-clamp-2 mb-1">{r.comment}</p>}
-                    {Array.isArray(r.mediaUrls) && r.mediaUrls.length > 0 && (
-                      <div className="flex gap-1 overflow-x-auto pt-0.5">
-                        {r.mediaUrls.map((url, idx) => {
-                          const isVid = isVideoUrl(url);
-                          return (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => setModalMedia(url)}
-                              className="relative w-7 h-7 rounded overflow-hidden border border-warm-200 bg-warm-100 shrink-0 hover:scale-105 transition-transform"
-                              title="View media"
-                            >
-                              {isVid ? (
-                                <div className="w-full h-full flex items-center justify-center bg-warm-900 text-white">
-                                  <Film className="w-3 h-3" />
-                                </div>
-                              ) : (
-                                <img src={url} alt="" className="w-full h-full object-cover" />
-                              )}
-                            </button>
-                          );
-                        })}
+              reviews.map((r) => {
+                const reviewId = r._id || r.id;
+                return (
+                  <tr key={reviewId} className={`hover:bg-warm-50/50 transition-colors ${r.isHidden ? 'opacity-50 bg-warm-50/30' : ''}`}>
+                    <td className="px-3 py-2 font-semibold text-warm-900 max-w-[140px] truncate">
+                      {r.productName || '—'}
+                    </td>
+                    <td className="px-3 py-2 text-warm-600">
+                      <p className="font-medium text-warm-900">{r.userName || 'Customer'}</p>
+                      <p className="text-[9px] text-warm-400">{r.userEmail}</p>
+                    </td>
+                    <td className="px-3 py-2">
+                      <StarRating rating={r.rating} size="xs" />
+                    </td>
+                    <td className="px-3 py-2 max-w-[240px]">
+                      {r.comment && <p className="text-warm-700 line-clamp-2 mb-1">{r.comment}</p>}
+                      {Array.isArray(r.mediaUrls) && r.mediaUrls.length > 0 && (
+                        <div className="flex gap-1 overflow-x-auto pt-0.5">
+                          {r.mediaUrls.map((url, idx) => {
+                            const isVid = isVideoUrl(url);
+                            return (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => setModalMedia(url)}
+                                className="relative w-7 h-7 rounded overflow-hidden border border-warm-200 bg-warm-100 shrink-0 hover:scale-105 transition-transform"
+                                title="View media"
+                              >
+                                {isVid ? (
+                                  <div className="w-full h-full flex items-center justify-center bg-warm-900 text-white">
+                                    <Film className="w-3 h-3" />
+                                  </div>
+                                ) : (
+                                  <img src={url} alt="" className="w-full h-full object-cover" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-warm-400 text-[10px]">
+                      {new Date(r.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => toggleHide(reviewId)}
+                          className={`p-1 rounded-md transition-colors ${
+                            r.isHidden
+                              ? 'text-emerald-600 hover:bg-emerald-50'
+                              : 'text-warm-500 hover:bg-warm-100'
+                          }`}
+                          title={r.isHidden ? 'Publish review' : 'Hide review'}
+                        >
+                          {r.isHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                        </button>
+                        <button
+                          onClick={() => handleDelete(reviewId)}
+                          className="p-1 text-warm-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                          title="Delete review"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-warm-400 text-[10px]">
-                    {new Date(r.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => toggleHide(r.id)}
-                        className={`p-1 rounded-md transition-colors ${
-                          r.isHidden
-                            ? 'text-emerald-600 hover:bg-emerald-50'
-                            : 'text-warm-500 hover:bg-warm-100'
-                        }`}
-                        title={r.isHidden ? 'Publish review' : 'Hide review'}
-                      >
-                        {r.isHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                      </button>
-                      <button
-                        onClick={() => handleDelete(r.id)}
-                        className="p-1 text-warm-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                        title="Delete review"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

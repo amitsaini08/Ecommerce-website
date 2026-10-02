@@ -1,45 +1,36 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase, Coupon } from '@/lib/db/models';
-import { requireAdmin } from '@/lib/auth';
+import { Coupon } from '@/lib/db/models';
+import { couponSchema } from '@/lib/validations';
+import { routeHandler, AppError } from '@/app/api/routeHandler';
 
-export async function PUT(request, { params }) {
-  try {
-    await requireAdmin(request);
+export const PUT = routeHandler({
+  auth: true,
+  roles: ['admin'],
+  schema: couponSchema,
+  handler: async (request, { params, data }) => {
     const { id } = await params;
-    const body = await request.json();
-
-    await connectToDatabase();
     const coupon = await Coupon.findById(id);
-    if (!coupon) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (!coupon) throw new AppError('Coupon not found', 404);
 
-    if (body.code) coupon.code = body.code.toUpperCase();
-    if (body.type) coupon.type = body.type;
-    if (body.value !== undefined) coupon.value = Number(body.value);
-    if (body.minOrderAmount !== undefined) coupon.minOrderAmount = body.minOrderAmount ? Number(body.minOrderAmount) : 0;
-    if (body.expiresAt !== undefined) coupon.expiresAt = body.expiresAt ? new Date(body.expiresAt) : null;
-    if (body.isActive !== undefined) coupon.isActive = body.isActive;
+    if (data.code) coupon.code = data.code.toUpperCase();
+    if (data.type) coupon.type = data.type;
+    if (data.value !== undefined) coupon.value = Number(data.value);
+    if (data.minOrderAmount !== undefined) coupon.minOrderAmount = Number(data.minOrderAmount || 0);
+    if (data.expiresAt !== undefined) coupon.expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
+    if (data.isActive !== undefined) coupon.isActive = data.isActive;
 
     await coupon.save();
-    return NextResponse.json({ coupon: { ...coupon.toObject(), id: coupon._id } });
-  } catch (error) {
-    if (error.message === 'Unauthorized' || error.message === 'Forbidden')
-      return NextResponse.json({ error: error.message }, { status: 403 });
-    return NextResponse.json({ error: 'Failed' }, { status: 500 });
-  }
-}
+    return NextResponse.json({ coupon: coupon.toObject() });
+  },
+});
 
-export async function DELETE(request, { params }) {
-  try {
-    await requireAdmin(request);
+export const DELETE = routeHandler({
+  auth: true,
+  roles: ['admin'],
+  handler: async (request, { params }) => {
     const { id } = await params;
-
-    await connectToDatabase();
-    await Coupon.deleteOne({ _id: id });
-
+    const res = await Coupon.deleteOne({ _id: id });
+    if (res.deletedCount === 0) throw new AppError('Coupon not found', 404);
     return NextResponse.json({ message: 'Deleted' });
-  } catch (error) {
-    if (error.message === 'Unauthorized' || error.message === 'Forbidden')
-      return NextResponse.json({ error: error.message }, { status: 403 });
-    return NextResponse.json({ error: 'Failed' }, { status: 500 });
-  }
-}
+  },
+});

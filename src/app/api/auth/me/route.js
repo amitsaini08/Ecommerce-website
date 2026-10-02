@@ -1,27 +1,21 @@
 import { NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/auth';
 import { connectToDatabase, User } from '@/lib/db/models';
+import { routeHandler } from '../../routeHandler';
 
-export async function GET(request) {
-  try {
-    const authUser = await getAuthUser(request);
 
-    if (!authUser) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
-    }
-
-    await connectToDatabase();
-    const dbUser = await User.findById(authUser.id)
-      .select('_id name email phone role avatarUrl')
-      .lean();
+export const GET = routeHandler({
+  auth: true,
+  roles: ['admin', 'customer'],
+  handler: async (request, { user }) => {
+    console.log("GET /api/auth/me called. Authenticated user:", user);
+    const authUser = user;
+    const dbUser = await User.findById(authUser.id).select('_id name email phone role avatarUrl').lean();
 
     if (dbUser) {
       return NextResponse.json({
         user: {
-          id: dbUser._id,
+          _id: dbUser._id,
           name: dbUser.name,
           email: dbUser.email,
           phone: dbUser.phone,
@@ -32,10 +26,5 @@ export async function GET(request) {
     }
 
     return NextResponse.json({ user: authUser });
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Not authenticated' },
-      { status: 401 }
-    );
   }
-}
+});

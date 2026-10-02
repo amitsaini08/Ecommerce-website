@@ -1,24 +1,17 @@
 import { NextResponse } from 'next/server';
-import { getAuthUser } from '@/lib/auth';
-import { connectToDatabase, User } from '@/lib/db/models';
+import { User } from '@/lib/db/models';
+import { routeHandler } from '@/app/api/routeHandler';
 
-export async function DELETE(req, { params }) {
-  try {
-    const authUser = await getAuthUser(req);
-    if (!authUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+export const DELETE = routeHandler({
+  auth: true,
+  roles: ['customer', 'admin'],
+  handler: async (request, { user, params }) => {
     const { productId } = await params;
-
-    await connectToDatabase();
     await User.updateOne(
-      { _id: authUser.id },
-      { $pull: { wishlist: productId } }
+      { _id: user._id },
+      { $pull: { wishlist: String(productId) } }
     );
 
     return NextResponse.json({ success: true });
-  } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
+  },
+});

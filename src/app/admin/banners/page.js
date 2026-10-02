@@ -86,7 +86,7 @@ export default function AdminBannersPage() {
     }
     setSaving(true);
     try {
-      const url = editingBanner ? `/api/admin/banners/${editingBanner.id}` : '/api/admin/banners';
+      const url = editingBanner ? `/api/admin/banners/${editingBanner._id || editingBanner.id}` : '/api/admin/banners';
       const method = editingBanner ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -126,7 +126,7 @@ export default function AdminBannersPage() {
 
   async function toggleActive(b) {
     try {
-      const res = await fetch(`/api/admin/banners/${b.id}`, {
+      const res = await fetch(`/api/admin/banners/${b._id || b.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...b, isActive: !b.isActive }),
@@ -178,67 +178,70 @@ export default function AdminBannersPage() {
                   <p className="text-[10px] text-warm-500 mt-0.5">Click "Add New Banner" above to publish your first banner.</p>
                 </td>
               </tr>
-            ) : banners.map((b) => (
-              <tr key={b.id} className="hover:bg-warm-50/50 transition-colors">
-                <td className="px-3 py-2.5">
-                  <div
-                    className="w-24 h-11 rounded-md overflow-hidden relative flex items-center justify-center border border-warm-200 p-1.5 text-white text-[9px] font-bold text-center"
-                    style={{ backgroundColor: b.bgColor || '#18181b' }}
-                  >
-                    {b.imageUrl ? (
-                      <Image src={b.imageUrl} alt="" fill className="object-cover opacity-80" sizes="96px" />
+            ) : banners.map((b) => {
+              const bannerId = b._id || b.id;
+              return (
+                <tr key={bannerId} className="hover:bg-warm-50/50 transition-colors">
+                  <td className="px-3 py-2.5">
+                    <div
+                      className="w-24 h-11 rounded-md overflow-hidden relative flex items-center justify-center border border-warm-200 p-1.5 text-white text-[9px] font-bold text-center"
+                      style={{ backgroundColor: b.bgColor || '#18181b' }}
+                    >
+                      {b.imageUrl ? (
+                        <Image src={b.imageUrl} alt="" fill className="object-cover opacity-80" sizes="96px" />
+                      ) : (
+                        <span className="line-clamp-2 leading-tight">{b.title}</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <div>
+                      <p className="font-semibold text-warm-900 text-[11px]">{b.title}</p>
+                      {b.subtitle && <p className="text-warm-500 text-[10px] line-clamp-1 mt-0.5">{b.subtitle}</p>}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5 text-[11px] text-warm-600 font-mono">
+                    {b.linkUrl ? (
+                      <a href={b.linkUrl} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-1">
+                        {b.linkUrl} <ExternalLink className="w-2.5 h-2.5 text-warm-400" />
+                      </a>
                     ) : (
-                      <span className="line-clamp-2 leading-tight">{b.title}</span>
+                      '—'
                     )}
-                  </div>
-                </td>
-                <td className="px-3 py-2.5">
-                  <div>
-                    <p className="font-semibold text-warm-900 text-[11px]">{b.title}</p>
-                    {b.subtitle && <p className="text-warm-500 text-[10px] line-clamp-1 mt-0.5">{b.subtitle}</p>}
-                  </div>
-                </td>
-                <td className="px-3 py-2.5 text-[11px] text-warm-600 font-mono">
-                  {b.linkUrl ? (
-                    <a href={b.linkUrl} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-1">
-                      {b.linkUrl} <ExternalLink className="w-2.5 h-2.5 text-warm-400" />
-                    </a>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-                <td className="px-3 py-2.5 text-center font-bold text-warm-900 text-[11px]">{b.sortOrder}</td>
-                <td className="px-3 py-2.5 text-center">
-                  <button
-                    onClick={() => toggleActive(b)}
-                    className={`px-2 py-0.5 text-[10px] font-semibold rounded-full capitalize inline-flex items-center gap-1 ${
-                      b.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-warm-100 text-warm-500'
-                    }`}
-                  >
-                    {b.isActive ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
-                    {b.isActive ? 'Active' : 'Inactive'}
-                  </button>
-                </td>
-                <td className="px-3 py-2.5 text-right">
-                  <div className="flex items-center justify-end gap-1.5">
+                  </td>
+                  <td className="px-3 py-2.5 text-center font-bold text-warm-900 text-[11px]">{b.sortOrder}</td>
+                  <td className="px-3 py-2.5 text-center">
                     <button
-                      onClick={() => handleOpenEdit(b)}
-                      className="p-1 text-warm-600 hover:text-warm-900 hover:bg-warm-100 rounded-md transition-colors"
-                      title="Edit"
+                      onClick={() => toggleActive(b)}
+                      className={`px-2 py-0.5 text-[10px] font-semibold rounded-full capitalize inline-flex items-center gap-1 ${
+                        b.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-warm-100 text-warm-500'
+                      }`}
                     >
-                      <Edit2 className="w-3.5 h-3.5" />
+                      {b.isActive ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
+                      {b.isActive ? 'Active' : 'Inactive'}
                     </button>
-                    <button
-                      onClick={() => handleDelete(b.id)}
-                      className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-md transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-3 py-2.5 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => handleOpenEdit(b)}
+                        className="p-1 text-warm-600 hover:text-warm-900 hover:bg-warm-100 rounded-md transition-colors"
+                        title="Edit"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(bannerId)}
+                        className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-md transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

@@ -6,8 +6,8 @@ const ACCESS_TOKEN_EXPIRY = '15m';
 const REFRESH_TOKEN_EXPIRY = '7d';
 
 export function generateTokens(user) {
-  const payload = { id: user._id || user.id, email: user.email, role: user.role, name: user.name };
-
+  const payload = { _id: user._id , email: user.email, role: user.role, name: user.name };
+ 
   const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
     expiresIn: ACCESS_TOKEN_EXPIRY,
   });
@@ -84,9 +84,9 @@ export async function getAuthUser(request) {
   const accessToken = cookieStore.get("access_token")?.value;
 
   if (accessToken) decoded = verifyAccessToken(accessToken);
-
+ 
   if (!decoded) {
-    const refreshToken = cookieStore.get("refresh_token")?.value;
+    const refreshToken = cookieStore.get("refresh_token")?.value;  
     if (refreshToken) decoded = verifyRefreshToken(refreshToken);
   }
 
@@ -94,19 +94,18 @@ export async function getAuthUser(request) {
 
   try {
     await connectToDatabase();
-    const user = await User.findById(decoded.id).lean();
+    const user = await User.findById(decoded._id).lean();
     if (!user) return null;
     return {
       ...user,
-      id: String(user._id),
       _id: String(user._id),
     };
   } catch (error) {
     console.error("getAuthUser error:", error);
     return null;
-  }
-}
+ }
 
+}
 
 export async function requireAuth(request) {
   const user = await getAuthUser(request);
@@ -124,6 +123,3 @@ export async function requireAdmin(request) {
   return user;
 }
 
-export function generateOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}

@@ -1,54 +1,29 @@
-'use client';
-
 import Link from 'next/link';
-import Image from 'next/image';
-import { Folder, Grid } from 'lucide-react';
+import Section from '@/components/ui/Section';
+import CategoryImage from '@/components/ui/CategoryImage';
 
 export default function CategoryQuickNav({ categories = [] }) {
-  if (!categories || categories.length === 0) return null;
+  if (!categories?.length) return null;
 
   return (
-    <div className="bg-white border-b border-warm-200/80 shadow-2xs py-3">
-      <div className="max-w-4xl mx-auto px-1">
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-1">
+    <Section padding="sm" className="border-b border-warm-100">
+      <div className="no-scrollbar flex items-center gap-5 overflow-x-auto sm:gap-7">
+        {categories.map((cat) => (
           <Link
-            href="/products"
-            className="group shrink-0 flex flex-col items-center text-center w-16 "
+            key={cat._id || cat.id}
+            href={`/categories/${cat.slug}`}
+            className="group flex w-20 shrink-0 flex-col items-center gap-2"
           >
-            <div className="w-10 h-10 rounded-full bg-warm-900 text-white flex items-center justify-center mb-1.5 shadow-xs group-hover:scale-105 transition-transform">
-              <Grid className="w-3 h-3 " />
-            </div>
-            <span className="text-[11px] font-semibold text-warm-900 line-clamp-1 group-hover:text-warm-700">
-              All Items
+            <CategoryImage
+              category={cat}
+              className="transition-all duration-200 group-hover:-translate-y-0.5 group-hover:border-warm-400 group-hover:shadow-sm"
+            />
+            <span className="w-full truncate text-center text-xs font-medium text-warm-700 transition-colors group-hover:text-warm-900">
+              {cat.name}
             </span>
           </Link>
-
-          {categories.map((cat) => (
-            <Link
-              key={cat.id}
-              href={`/categories/${cat.slug}`}
-              className="group shrink-0 flex flex-col items-center text-center w-16 "
-            >
-              <div className=" w-10 h-10 rounded-full overflow-hidden bg-warm-100 border border-warm-200 flex items-center justify-center mb-1.5 shadow-2xs relative group-hover:scale-105 transition-transform">
-                {cat.imageUrl ? (
-                  <Image
-                    src={cat.imageUrl}
-                    alt={cat.name}
-                    fill
-                    className="object-cover"
-                    sizes="56px"
-                  />
-                ) : (
-                  <Folder className="w-3 h-3 text-warm-400" />
-                )}
-              </div>
-              <span className="text-[11px] font-semibold text-warm-800 line-clamp-1 group-hover:text-warm-900">
-                {cat.name}
-              </span>
-            </Link>
-          ))}
-        </div>
+        ))}
       </div>
-    </div>
+    </Section>
   );
 }

@@ -42,13 +42,14 @@ export function flattenCategoriesWithDepth(categories) {
   function walk(parentId, depth) {
     const children = parentId === null
       ? categories.filter((c) => (c.parentIds || []).length === 0)
-      : categories.filter((c) => (c.parentIds || []).includes(parentId));
+      : categories.filter((c) => (c.parentIds || []).map(String).includes(String(parentId)));
 
     for (const cat of children) {
-      if (renderedIds.has(cat.id)) continue; // already shown once — skip repeat
-      renderedIds.add(cat.id);
+      const catId = cat._id || cat.id;
+      if (renderedIds.has(String(catId))) continue; // already shown once — skip repeat
+      renderedIds.add(String(catId));
       result.push({ ...cat, depth });
-      walk(cat.id, depth + 1);
+      walk(catId, depth + 1);
     }
   }
 

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectUser, clearUser } from '@/lib/store/authSlice';
 import {
   LayoutDashboard,
   Package,
@@ -21,8 +20,16 @@ import {
   ChevronRight,
   Image as ImageIcon,
 } from 'lucide-react';
+import { selectUser, clearUser } from '@/lib/store/authSlice';
+import { cn } from '@/lib/cn';
+import Logo from '@/components/ui/Logo';
+import Container from '@/components/ui/Container';
+import Avatar from '@/components/ui/Avatar';
+import IconButton from '@/components/ui/IconButton';
+import Badge from '@/components/ui/Badge';
+import Spinner from '@/components/ui/Spinner';
 
-const navItems = [
+const NAV_ITEMS = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { label: 'Banners', href: '/admin/banners', icon: ImageIcon },
   { label: 'Products', href: '/admin/products', icon: Package },
@@ -34,6 +41,9 @@ const navItems = [
   { label: 'Settings', href: '/admin/settings', icon: Settings },
 ];
 
+const isActivePath = (pathname, href) =>
+  href === '/admin' ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+
 export default function AdminLayout({ children }) {
   const user = useSelector(selectUser);
   const dispatch = useDispatch();
@@ -41,20 +51,15 @@ export default function AdminLayout({ children }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // non-admin ko storefront par bhejo
   useEffect(() => {
-    if (user && user.role !== 'admin') router.push('/');
+    if (user && user.role !== 'admin') router.replace('/');
   }, [user, router]);
 
-  if (!user || user.role !== 'admin') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-warm-50">
-        <div className="text-center">
-          <div className="w-6 h-6 border-2 border-brand-600/30 border-t-brand-600 rounded-full animate-spin mx-auto mb-2" />
-          <p className="text-warm-500 text-[11px]">Loading admin panel...</p>
-        </div>
-      </div>
-    );
-  }
+  // page badalte hi mobile sidebar band
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -62,114 +67,135 @@ export default function AdminLayout({ children }) {
     router.push('/');
   }
 
+  if (!user || user.role !== 'admin') {
+    return (
+      <div className="flex h-dvh items-center justify-center bg-warm-50">
+        <div className="flex flex-col items-center gap-3">
+          <Spinner className="h-6 w-6" />
+          <p className="text-sm text-warm-500">Loading admin panel...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-screen flex bg-warm-50/50 text-warm-900 antialiased overflow-hidden">
-      {/* Sidebar - fixed to viewport height, never grows with page content */}
+    <div className="flex h-dvh overflow-hidden bg-warm-50 text-warm-900 antialiased">
+      {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-40 h-screen bg-warm-900 text-white transform transition-transform duration-300 lg:relative lg:translate-x-0 lg:h-full flex flex-col ${
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 flex w-60 flex-col bg-warm-900 text-white transition-transform duration-300',
+          'lg:static lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        )}
       >
-        {/* Header - fixed, does not scroll */}
-        <div className="shrink-0 flex items-center justify-between px-3.5 py-3 border-b border-warm-800">
-          <Link href="/admin" className="flex items-center gap-1.5">
-            <span className="text-sm font-bold tracking-tight text-white">
-              Nova<span className="text-brand-400">Hub</span>
-            </span>
-            <span className="text-[9px] px-1 py-0.5 bg-brand-500/20 text-brand-300 rounded font-semibold uppercase tracking-wider">
-              Admin
-            </span>
-          </Link>
-          <button
+        <div className="flex shrink-0 items-center justify-between border-b border-warm-800 px-4 py-4">
+          <div className="flex items-center gap-2">
+            <Logo tone="dark" href="/admin" />
+            <Badge className="bg-brand-500/20 uppercase tracking-wide text-brand-300">Admin</Badge>
+          </div>
+          <IconButton
+            label="Close menu"
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden p-1 text-warm-400 hover:text-white rounded"
+            className="h-8 w-8 text-warm-400 hover:bg-warm-800 hover:text-white lg:hidden"
           >
-            <X className="w-4 h-4" />
-          </button>
+            <X className="h-5 w-5" />
+          </IconButton>
         </div>
 
-        {/* Navigation - the ONLY part that scrolls if links overflow */}
-        <nav className="flex-1 min-h-0 overflow-y-auto p-2 space-y-0.5">
-          {navItems.map((item) => {
-            const isActive =
-              pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all ${
-                  isActive
-                    ? 'bg-brand-600 text-white shadow-sm'
-                    : 'text-warm-400 hover:text-white hover:bg-warm-800'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{item.label}</span>
-                </div>
-                {isActive && <ChevronRight className="w-3 h-3 text-white/70" />}
-              </Link>
-            );
-          })}
+        {/* Sirf ye hissa scroll hota hai */}
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
+          {NAV_ITEMS.map((item) => (
+            <NavItem
+              key={item.href}
+              href={item.href}
+              icon={item.icon}
+              active={isActivePath(pathname, item.href)}
+            >
+              {item.label}
+            </NavItem>
+          ))}
         </nav>
 
-        {/* Footer controls - fixed, never scrolls */}
-        <div className="shrink-0 p-2 border-t border-warm-800 space-y-0.5">
-          <Link
-            href="/"
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] text-warm-300 hover:text-white hover:bg-warm-800 transition-colors"
-          >
-            <Store className="w-3.5 h-3.5" />
-            <span>View Storefront</span>
-          </Link>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 w-full px-2.5 py-1.5 rounded-md text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out</span>
-          </button>
+        <div className="shrink-0 space-y-1 border-t border-warm-800 p-3">
+          <NavItem href="/" icon={Store}>
+            View storefront
+          </NavItem>
+          <NavItem icon={LogOut} danger onClick={handleLogout}>
+            Sign out
+          </NavItem>
         </div>
       </aside>
 
-      {/* Overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 lg:hidden backdrop-blur-xs"
+          aria-hidden="true"
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Main Content Area - this is the only thing that scrolls on desktop */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
-        {/* Top Header */}
-        <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-warm-200 px-3 sm:px-5 py-2.5 flex items-center justify-between">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-1 text-warm-600 hover:bg-warm-100 rounded-md"
-          >
-            <Menu className="w-4 h-4" />
-          </button>
-          <div className="hidden lg:block text-[11px] text-warm-500 font-medium">
-            Admin Management Portal
-          </div>
-          <div className="flex items-center gap-2 ml-auto">
-            <div className="text-right">
-              <p className="text-[11px] font-semibold text-warm-900">{user.name}</p>
-              <p className="text-[9px] text-warm-500">{user.email}</p>
+      {/* Content: desktop par yahi scroll hota hai */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+        <header className="sticky top-0 z-30 border-b border-warm-200 bg-white/90 backdrop-blur-md">
+          <Container className="flex h-14 items-center justify-between">
+            <IconButton
+              label="Open menu"
+              onClick={() => setSidebarOpen(true)}
+              className="-ml-2 lg:hidden"
+            >
+              <Menu className="h-5 w-5" />
+            </IconButton>
+
+            <p className="hidden text-sm font-medium text-warm-500 lg:block">Admin management portal</p>
+
+            <div className="ml-auto flex items-center gap-3">
+              <div className="hidden text-right sm:block">
+                <p className="text-sm font-semibold leading-tight text-warm-900">{user.name}</p>
+                <p className="text-xs text-warm-500">{user.email}</p>
+              </div>
+              <Avatar user={user} size="md" />
             </div>
-            <div className="w-7 h-7 bg-warm-900 text-white rounded-md flex items-center justify-center font-bold text-[11px] shadow-xs">
-              {user.name?.[0]?.toUpperCase() || 'A'}
-            </div>
-          </div>
+          </Container>
         </header>
 
-        <main className="flex-1 p-3 sm:p-4 lg:p-5 max-w-7xl mx-auto w-full">
-          {children}
+        <main className="flex-1 py-6">
+          <Container>{children}</Container>
         </main>
       </div>
     </div>
+  );
+}
+
+// Sirf is layout ka helper hai, shared component nahi
+function NavItem({ href, icon: Icon, active, danger, onClick, children }) {
+  const classes = cn(
+    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+    active
+      ? 'bg-brand-600 text-white shadow-sm'
+      : danger
+        ? 'text-red-400 hover:bg-red-500/10 hover:text-red-300'
+        : 'text-warm-300 hover:bg-warm-800 hover:text-white'
+  );
+
+  const content = (
+    <>
+      <Icon className="h-4 w-4 shrink-0" />
+      <span className="flex-1 truncate text-left">{children}</span>
+      {active && <ChevronRight className="h-4 w-4 text-white/70" />}
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} aria-current={active ? 'page' : undefined} className={classes}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button type="button" onClick={onClick} className={classes}>
+      {content}
+    </button>
   );
 }

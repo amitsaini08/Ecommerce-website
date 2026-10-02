@@ -3,264 +3,183 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AlertCircle, ArrowRight, Eye, EyeOff, Lock, Mail, User, Check, X } from 'lucide-react';
-import { checkPasswordRules, validateEmailFormat } from '@/lib/inputHelpers';
+import { ArrowRight, Lock, Mail, User } from 'lucide-react';
+import { signupSchema, passwordRules } from '@/lib/validations';
+import AuthCard from '@/components/ui/AuthCard';
+import Field from '@/components/ui/Field';
+import Input from '@/components/ui/Input';
+import Alert from '@/components/ui/Alert';
+import Button from '@/components/ui/Button';
+import PasswordRules from '@/components/auth/PasswordRules';
+
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import z from 'zod';
+
+// Frontend-only schema: confirmPassword API ka hissa nahi hai
+const signupFormSchema = signupSchema
+  .extend({ confirmPassword: z.string().min(1, 'Please confirm your password') })
+  .refine((d) => d.password === d.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
+
+const PASSWORD_CHECKLIST = [
+  { key: 'len', message: 'Must be at least 8 characters', label: 'At least 8 characters' },
+  { key: 'upper', message: 'Must contain at least one uppercase letter', label: 'One uppercase letter' },
+  { key: 'lower', message: 'Must contain at least one lowercase letter', label: 'One lowercase letter' },
+  { key: 'num', message: 'Must contain at least one number', label: 'One number' },
+  { key: 'special', message: 'Must contain at least one special character', label: 'One special character' },
+];
+
+function getPasswordChecklist(value) {
+  const result = passwordRules.safeParse(value);
+  const failed = new Set(result.success ? [] : result.error.issues.map((i) => i.message));
+  return PASSWORD_CHECKLIST.map(({ key, message, label }) => ({
+    key,
+    label,
+    passed: !failed.has(message),
+  }));
+}
 
 export default function SignupPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState({ name: '', email: '', password: '', confirmPassword: '' });
   const [generalError, setGeneralError] = useState('');
 
-  const pwCheck = checkPasswordRules(form.password);
-  const confirmMatch = !form.confirmPassword || form.password === form.confirmPassword;
+  const {
+    register,
+    handleSubmit,
+    setError,
+    watch,
+    trigger,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(signupFormSchema),
+    validationMode: 'onChange',
+    defaultValues: { name: '', email: '', password: '', confirmPassword: '' },
+  });
 
-  const isFormValid =
-    form.name.trim().length >= 2 &&
-    form.email.trim() &&
-    !validateEmailFormat(form.email) &&
-    pwCheck.minLength &&
-    pwCheck.hasUpper &&
-    pwCheck.hasLower &&
-    pwCheck.hasNumber &&
-    pwCheck.hasSpecial &&
-    form.confirmPassword &&
-    form.password === form.confirmPassword;
+  const password = watch('password');
+  const confirmPassword = watch('confirmPassword');
+  const showChecklist = password.length > 0;
 
-  const handleNameChange = (e) => {
-    const val = e.target.value;
-    setForm((prev) => ({ ...prev, name: val }));
+  const onSubmit = async ({ confirmPassword, ...payload }) => {
     setGeneralError('');
-    if (!val.trim()) {
-      setFieldErrors((prev) => ({ ...prev, name: 'Name is required' }));
-    } else if (val.trim().length < 2) {
-      setFieldErrors((prev) => ({ ...prev, name: 'Name must be at least 2 characters' }));
-    } else {
-      setFieldErrors((prev) => ({ ...prev, name: '' }));
-    }
-  };
 
-  const handleEmailChange = (e) => {
-    const val = e.target.value;
-    setForm((prev) => ({ ...prev, email: val }));
-    setGeneralError('');
-    setFieldErrors((prev) => ({ ...prev, email: validateEmailFormat(val) }));
-  };
-
-  const handlePasswordChange = (e) => {
-    const val = e.target.value;
-    setForm((prev) => ({ ...prev, password: val }));
-    setGeneralError('');
-    setFieldErrors((prev) => ({ ...prev, password: '' }));
-  };
-
-  const handleConfirmChange = (e) => {
-    const val = e.target.value;
-    setForm((prev) => ({ ...prev, confirmPassword: val }));
-    setGeneralError('');
-    if (val && form.password && val !== form.password) {
-      setFieldErrors((prev) => ({ ...prev, confirmPassword: 'Passwords do not match' }));
-    } else {
-      setFieldErrors((prev) => ({ ...prev, confirmPassword: '' }));
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setGeneralError('');
-    setFieldErrors({ name: '', email: '', password: '', confirmPassword: '' });
-
-    if (!isFormValid) return;
-
-    setLoading(true);
-
+    let res;
     try {
-      const res = await fetch('/api/auth/signup', {
+      res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          email: form.email.trim(),
-          password: form.password,
-        }),
+        body: JSON.stringify(payload),
       });
+    } catch {
+      setGeneralError('Network error. Please check your connection and try again.');
+      return;
+    }
 
-      const data = await res.json();
+    const data = await res.json().catch(() => null);
 
-      if (!res.ok) {
-        if (data.field) {
-          setFieldErrors((prev) => ({ ...prev, [data.field]: data.error || data.message }));
-        } else {
-          setGeneralError(data.error || 'Something went wrong');
-        }
+    if (!res.ok) {
+      const fields = ['name', 'email', 'password'];
+      if (fields.includes(data?.field)) {
+        setError(data.field, { message: data.error || data.message });
         return;
       }
-      router.push('/login?registered=true')
-    } catch {
-      setGeneralError('Network error. Please try again.');
-    } finally {
-      setLoading(false);
+      setGeneralError(data?.error || 'Signup failed. Please try again later.');
+      return;
     }
+
+    router.push('/login?registered=true');
   };
 
+  const clearGeneral = () => setGeneralError('');
+
   return (
-    <div className="w-full max-w-sm mx-auto">
-      <div className="bg-white border border-warm-200 border-t-2 border-t-brand-500 rounded-md shadow-sm p-5 sm:p-6">
-        {/* Header */}
-        <h1 className="text-lg font-bold text-warm-900 tracking-tight">Create account</h1>
-        <p className="text-[11px] text-warm-500 mt-1 mb-4">Join NovaHub for an elevated shopping experience</p>
+    <AuthCard
+      title="Create account"
+      subtitle="Join NovaHub for an elevated shopping experience"
+      footer={
+        <>
+          Already have an account?{' '}
+          <Link href="/login" className="font-semibold text-brand-600 transition-colors hover:text-brand-700">
+            Sign In
+          </Link>
+        </>
+      }
+    >
+      {generalError && <Alert className="mb-4">{generalError}</Alert>}
 
-        {/* General Error Alert */}
-        {generalError && (
-          <div className="mb-3 p-2.5 bg-red-50 border border-red-200 rounded-md text-red-700 text-[11px] flex items-start gap-2">
-            <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
-            <span>{generalError}</span>
-          </div>
-        )}
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+        <Field label="Full Name" htmlFor="signup-name" required error={errors.name?.message}>
+          <Input
+            id="signup-name"
+            icon={User}
+            placeholder="John Doe"
+            autoComplete="name"
+            error={errors.name?.message}
+            {...register('name', { onChange: clearGeneral })}
+          />
+        </Field>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label htmlFor="signup-name" className="block text-[10px] font-semibold text-warm-700 mb-1">
-              Full Name *
-            </label>
-            <div className="relative">
-              <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-warm-400" />
-              <input
-                id="signup-name"
-                type="text"
-                value={form.name}
-                onChange={handleNameChange}
-                className="w-full pl-8 pr-3 py-1.5 bg-white border border-warm-200 rounded-md text-[11px] text-warm-900 placeholder-warm-400 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10 transition-all"
-                placeholder="John Doe"
-                required
-              />
-            </div>
-            {fieldErrors.name && <p className="text-red-600 text-[10px] mt-1">{fieldErrors.name}</p>}
-          </div>
+        <Field label="Email Address" htmlFor="signup-email" required error={errors.email?.message}>
+          <Input
+            id="signup-email"
+            type="email"
+            icon={Mail}
+            placeholder="you@example.com"
+            autoComplete="email"
+            error={errors.email?.message}
+            {...register('email', { onChange: clearGeneral })}
+          />
+        </Field>
 
-          <div>
-            <label htmlFor="signup-email" className="block text-[10px] font-semibold text-warm-700 mb-1">
-              Email Address *
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-warm-400" />
-              <input
-                id="signup-email"
-                type="email"
-                value={form.email}
-                onChange={handleEmailChange}
-                className="w-full pl-8 pr-3 py-1.5 bg-white border border-warm-200 rounded-md text-[11px] text-warm-900 placeholder-warm-400 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10 transition-all"
-                placeholder="you@example.com"
-                required
-              />
-            </div>
-            {fieldErrors.email && <p className="text-red-600 text-[10px] mt-1">{fieldErrors.email}</p>}
-          </div>
-
-          <div>
-            <label htmlFor="signup-password" className="block text-[10px] font-semibold text-warm-700 mb-1">
-              Password *
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-warm-400" />
-              <input
-                id="signup-password"
-                type={showPassword ? 'text' : 'password'}
-                value={form.password}
-                onChange={handlePasswordChange}
-                className="w-full pl-8 pr-8 py-1.5 bg-white border border-warm-200 rounded-md text-[11px] text-warm-900 placeholder-warm-400 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10 transition-all"
-                placeholder="Enter password"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-warm-400 hover:text-warm-600 transition-colors"
-              >
-                {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-            {fieldErrors.password && <p className="text-red-600 text-[10px] mt-1">{fieldErrors.password}</p>}
-
-            {/* Password rules checklist */}
-            {form.password.length > 0 && (
-              <div className="mt-2 p-2 bg-warm-50 border border-warm-100 rounded-md space-y-1">
-                <p className="text-[10px] font-bold text-warm-700">Password Requirements:</p>
-                {pwCheck.rules.slice(0, 5).map((rule) => (
-                  <div key={rule.key} className="flex items-center gap-1.5 text-[10px]">
-                    {rule.passed ? (
-                      <Check className="w-3 h-3 text-emerald-600 shrink-0" />
-                    ) : (
-                      <X className="w-3 h-3 text-red-500 shrink-0" />
-                    )}
-                    <span className={rule.passed ? 'text-emerald-700 font-medium' : 'text-warm-600'}>
-                      {rule.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="signup-confirm" className="block text-[10px] font-semibold text-warm-700 mb-1">
-              Confirm Password *
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-warm-400" />
-              <input
-                id="signup-confirm"
-                type={showConfirm ? 'text' : 'password'}
-                value={form.confirmPassword}
-                onChange={handleConfirmChange}
-                className="w-full pl-8 pr-8 py-1.5 bg-white border border-warm-200 rounded-md text-[11px] text-warm-900 placeholder-warm-400 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10 transition-all"
-                placeholder="Re-enter password"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirm(!showConfirm)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-warm-400 hover:text-warm-600 transition-colors"
-              >
-                {showConfirm ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-            {(!confirmMatch || fieldErrors.confirmPassword) && (
-              <p className="text-red-600 text-[10px] mt-1">
-                {fieldErrors.confirmPassword || 'Passwords do not match'}
-              </p>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading || !isFormValid}
-            className="w-full py-1.5 bg-warm-900 text-white text-[11px] font-semibold rounded-md hover:bg-warm-800 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-60 mt-2"
+        <div>
+          {/* Checklist dikh raha ho to text error dobara nahi dikhate, sirf red border */}
+          <Field
+            label="Password"
+            htmlFor="signup-password"
+            required
+            error={showChecklist ? undefined : errors.password?.message}
           >
-            {loading ? (
-              <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <>
-                <span>Create Account</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </>
-            )}
-          </button>
-        </form>
-
-        <div className="mt-4 pt-3 border-t border-warm-100 text-center">
-          <p className="text-[11px] text-warm-500">
-            Already have an account?{' '}
-            <Link href="/login" className="font-semibold text-brand-600 hover:text-brand-700 transition-colors">
-              Sign In
-            </Link>
-          </p>
+            <Input
+              id="signup-password"
+              type="password"
+              icon={Lock}
+              placeholder="Enter password"
+              autoComplete="new-password"
+              error={errors.password?.message}
+              {...register('password', { onChange: clearGeneral, deps: ['confirmPassword'] })}
+            />
+          </Field>
+          {showChecklist && <PasswordRules rules={getPasswordChecklist(password)} />}
         </div>
-      </div>
-    </div>
+
+        <Field
+          label="Confirm Password"
+          htmlFor="signup-confirm"
+          required
+          error={errors.confirmPassword?.message}
+        >
+          <Input
+            id="signup-confirm"
+            type="password"
+            icon={Lock}
+            placeholder="Re-enter password"
+            autoComplete="new-password"
+            error={errors.confirmPassword?.message}
+            {...register('confirmPassword', {
+              onChange: clearGeneral,
+              validate: (value) => value === password || 'Passwords do not match'
+            })}
+          />
+        </Field>
+
+        <Button type="submit" variant="dark" loading={isSubmitting} className="mt-2 w-full">
+          <span>Create Account</span>
+          {!isSubmitting && <ArrowRight className="h-4 w-4" />}
+        </Button>
+      </form>
+    </AuthCard>
   );
 }

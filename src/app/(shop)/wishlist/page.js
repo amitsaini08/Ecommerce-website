@@ -8,6 +8,8 @@ import ProductCard from '@/components/ui/ProductCard';
 import Breadcrumbs from '@/components/ui/Breadcrumbs';
 import { useToast } from '@/components/ui/Toast';
 import { Heart, Trash2, ArrowRight, ShoppingBag } from 'lucide-react';
+import Section from '@/components/ui/Section';
+import EmptyState from '@/components/ui/EmptyState';
 
 export default function WishlistPage() {
   const dispatch = useDispatch();
@@ -24,16 +26,18 @@ export default function WishlistPage() {
         try {
           await Promise.all(
             wishlistItems.map((item) =>
-              fetch(`/api/wishlist/${item.id}`, { method: 'DELETE' })
+              fetch(`/api/wishlist/${item._id || item.id}`, { method: 'DELETE' })
             )
           );
-        } catch {}
+        } catch { }
       }
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-3">
+    <Section className="bg-warm-50 ">
+
+      {/* <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-3"> */}
       <Breadcrumbs items={[{ label: 'Wishlist' }]} />
 
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-warm-200/80 pb-5">
@@ -61,29 +65,28 @@ export default function WishlistPage() {
       {wishlistItems.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 gap-4 sm:gap-5">
           {wishlistItems.map((product) => (
-            <ProductCard key={product.id} product={product} />
+            <ProductCard key={product._id || product.id} product={product} />
           ))}
         </div>
       ) : (
-        <div className="bg-white border border-warm-200 rounded-2xl p-12 text-center max-w-lg mx-auto my-8">
-          <div className="w-8 h-8 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500">
-            <Heart className="w-4 h-4" />
-          </div>
-          <h2 className="text-[18px] font-bold text-warm-900 mb-1">
-            Your Wishlist is Empty
-          </h2>
-          <p className="text-[11px] text-warm-500 max-w-sm mx-auto mb-6 leading-relaxed">
-            Save items you love by clicking the heart icon on any product. Revisit them anytime to compare or add to cart!
-          </p>
-          <Link
-            href="/products"
-            className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-warm-900 text-white text-[11px] font-semibold rounded-md hover:bg-warm-800 transition-colors shadow-xs"
-          >
-            <ShoppingBag className="w-2.5 h-2.5" />
-            Explore Products
-          </Link>
-        </div>
+        <>
+          <EmptyState
+            icon={Heart}
+            title="Your Wishlist is Empty"
+            description="Save items you love by clicking the heart icon on any product. Revisit them anytime to compare or add to cart!"
+            action={<>
+              <Link
+                href="/products"
+                className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-warm-900 text-white text-[11px] font-semibold rounded-md hover:bg-warm-800 transition-colors shadow-xs"
+              >
+                <ShoppingBag className="w-2.5 h-2.5" />
+                Explore Products
+              </Link>
+            </>} />
+        </>
       )}
-    </div>
+      {/* </div> */}
+
+    </Section>
   );
 }

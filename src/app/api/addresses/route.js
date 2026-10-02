@@ -1,56 +1,29 @@
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
-import { connectToDatabase, User } from '@/lib/db/models';
-import { getAuthUser } from '@/lib/auth';
+import { User } from '@/lib/db/models';
 import { addressSchema } from '@/lib/validations';
-import { parseAndValidate } from '@/lib/sanitization';
+import { routeHandler, AppError } from '../routeHandler';
 
-export async function GET(request) {
-  try {
-    const user = await getAuthUser(request);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    await connectToDatabase();
-    const dbUser = await User.findById(user.id).lean();
-
-    const list = (dbUser?.addresses || []).map((a) => ({ ...a, id: a._id }));
+export const GET = routeHandler({
+  auth: true,
+  handler: async (request, { user }) => {
+    const dbUser = await User.findById(user._id).lean();
+    const list = dbUser?.addresses || [];
     return NextResponse.json({ addresses: list });
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch addresses' }, { status: 500 });
-  }
-}
+  },
+});
 
-export async function POST(request) {
-  try {
-    const user = await getAuthUser(request);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const rawBody = await request.json().catch(() => ({}));
-    const validation = parseAndValidate(addressSchema, rawBody);
-
-    if (!validation.success) {
-      const firstError = validation.errors[0];
-      return NextResponse.json(
-        {
-          error: firstError?.message || 'Validation failed',
-          field: firstError?.field,
-          errors: validation.errors,
-        },
-        { status: 400 }
-      );
-    }
-
-    const { label, line1, line2, city, state, pincode, phone } = validation.sanitizedData;
-
-    await connectToDatabase();
-    const dbUser = await User.findById(user.id);
+export const POST = routeHandler({
+  auth: true,
+  schema: addressSchema,
+  handler: async (request, { user, data }) => {
+    const { label, line1, line2, city, state, pincode, phone } = data;
+    const dbUser = await User.findById(user._id);
 
     if (!dbUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      throw new AppError('User not found', 404);
     }
 
     const newAddress = {
-      _id: crypto.randomUUID(),
       label: label || null,
       line1,
       line2: line2 || null,
@@ -64,8 +37,7 @@ export async function POST(request) {
     dbUser.addresses.push(newAddress);
     await dbUser.save();
 
-    return NextResponse.json({ address: { ...newAddress, id: newAddress._id } }, { status: 201 });
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to create address' }, { status: 500 });
-  }
-}
+    const addedAddress = dbUser.addresses[dbUser.addresses.length - 1];
+    return NextResponse.json({ address: addedAddress }, { status: 201 });
+  },
+});

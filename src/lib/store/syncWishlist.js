@@ -8,7 +8,7 @@ import { setWishlist, clearWishlist } from './wishlistSlice';
 export async function syncWishlistOnAuth(dispatch, guestWishlistItems = []) {
   try {
     if (Array.isArray(guestWishlistItems) && guestWishlistItems.length > 0) {
-      const productIds = guestWishlistItems.map((item) => item.id).filter(Boolean);
+      const productIds = guestWishlistItems.map((item) => String(item._id || item.id || '')).filter(Boolean);
       if (productIds.length > 0) {
         await fetch('/api/wishlist', {
           method: 'POST',
@@ -20,11 +20,9 @@ export async function syncWishlistOnAuth(dispatch, guestWishlistItems = []) {
   } catch (err) {
     console.error('Failed to merge guest wishlist:', err);
   } finally {
-    // Clear local guest wishlist state so it never re-merges stale items
     dispatch(clearWishlist());
   }
 
-  // Fetch full database wishlist for authenticated user
   try {
     const wishlistRes = await fetch('/api/wishlist');
     if (wishlistRes.ok) {

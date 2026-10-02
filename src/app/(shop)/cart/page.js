@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
+import { ShoppingBag, Package, Trash2, Tag, ArrowRight, LogIn } from 'lucide-react';
 import { selectUser } from '@/lib/store/authSlice';
 import {
   selectCartItems,
@@ -15,11 +16,17 @@ import {
   applyCoupon,
   removeCoupon,
 } from '@/lib/store/cartSlice';
+import { formatCurrency, getEffectivePrice } from '@/lib/utils';
 import { useToast } from '@/components/ui/Toast';
+import Section from '@/components/ui/Section';
+import PageHeader from '@/components/ui/PageHeader';
+import EmptyState from '@/components/ui/EmptyState';
 import Breadcrumbs from '@/components/ui/Breadcrumbs';
 import Modal from '@/components/ui/Modal';
-import { formatCurrency } from '@/lib/utils';
-import { ShoppingBag, Package, Trash2, Minus, Plus, Tag, ArrowRight, Check, LogIn } from 'lucide-react';
+import Button from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
+import IconButton from '@/components/ui/IconButton';
+import QuantityStepper from '@/components/ui/QuantityStepper';
 
 export default function CartPage() {
   const router = useRouter();
@@ -29,18 +36,26 @@ export default function CartPage() {
   const items = useSelector(selectCartItems);
   const subtotal = useSelector(selectCartSubtotal);
   const coupon = useSelector(selectCartCoupon);
+
   const [couponCode, setCouponCode] = useState('');
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  const discount = coupon ? coupon.type === 'percent' ? (subtotal * coupon.value) / 100 : Math.min(coupon.value, subtotal) : 0;
+  const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
+
+  const discount = coupon
+    ? coupon.type === 'percent'
+      ? (subtotal * coupon.value) / 100
+      : Math.min(coupon.value, subtotal)
+    : 0;
   const total = Math.max(0, subtotal - discount);
 
   async function handleApplyCoupon() {
     if (!couponCode.trim()) return;
     setCouponLoading(true);
     setCouponError('');
+
     try {
       const res = await fetch('/api/coupons/validate', {
         method: 'POST',
@@ -48,6 +63,7 @@ export default function CartPage() {
         body: JSON.stringify({ code: couponCode.trim(), subtotal }),
       });
       const data = await res.json();
+
       if (res.ok) {
         dispatch(
           applyCoupon({
@@ -60,246 +76,240 @@ export default function CartPage() {
         toast.success('Coupon code applied!');
         setCouponCode('');
       } else {
-        setCouponError(data.error);
+        setCouponError(data.error || 'Invalid coupon');
       }
     } catch {
       setCouponError('Failed to validate coupon');
+    } finally {
+      setCouponLoading(false);
     }
-    setCouponLoading(false);
+  }
+
+  function handleCheckout() {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+    router.push('/checkout');
   }
 
   if (items.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
-        <div className="bg-white border border-warm-200 rounded-xl p-12 max-w-md mx-auto">
-          <ShoppingBag className="w-12 h-12 mx-auto text-warm-300 mb-4" />
-          <h1 className="text-md font-bold text-warm-900 mb-2">Your Shopping Cart is Empty</h1>
-          <p className="text-[11px] text-warm-500 mb-6">
-            Looks like you haven&apos;t added any products to your cart yet.
-          </p>
-          <Link
-            href="/products"
-            className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-warm-900 text-white text-xs font-semibold rounded-lg hover:bg-warm-800 transition-all"
-          >
-            <span>Browse Products</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </div>
+      <Section>
+        <EmptyState
+          icon={ShoppingBag}
+          title="Your cart is empty"
+          description="Looks like you haven't added any products to your cart yet."
+          action={
+            <Button href="/products" variant="dark">
+              <span>Browse products</span>
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          }
+        />
+      </Section>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
-      <Breadcrumbs items={[{ label: 'Cart' }]} />
+    <Section>
+      <div className="space-y-6">
+        <Breadcrumbs items={[{ label: 'Cart' }]} />
 
-      <div className="border-b border-warm-200/80 pb-4">
-        <h1 className="text-md font-bold text-warm-900 tracking-tight">Shopping Cart</h1>
-        <p className="text-[11px] text-warm-500 mt-1">
-          Review your selected items ({items.reduce((s, i) => s + i.quantity, 0)} total)
-        </p>
-      </div>
+        <PageHeader
+          title="Shopping cart"
+          subtitle={`Review your selected items (${itemCount} total)`}
+        />
 
-      <div className="grid lg:grid-cols-3 gap-8">
-        {/* Items List */}
-        <div className="lg:col-span-2 space-y-3">
-          {items.map((item) => (
-            <div
-              key={item.productId}
-              className="flex gap-4 p-2.5 bg-white border border-warm-200 rounded-xl shadow-2xs items-center"
-            >
-              <Link
-                href={`/products/${item.slug}`}
-                className="relative w-20 h-20 rounded-md overflow-hidden bg-warm-50 border border-warm-100 shrink-0"
-              >
-                {item.image ? (
-                  <Image src={item.image} alt={item.name} fill className="object-cover" sizes="96px" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-warm-300">
-                    <Package className="w-8 h-8" />
-                  </div>
-                )}
-              </Link>
+        <div className="grid gap-6 lg:grid-cols-3 lg:gap-8">
+          {/* Items */}
+          <div className="space-y-3 lg:col-span-2">
+            {items.map((item) => (
+              <CartItem
+                key={item.productId}
+                item={item}
+                onQuantityChange={(quantity) =>
+                  dispatch(updateQuantity({ productId: item.productId, quantity }))
+                }
+                onRemove={() => {
+                  dispatch(removeItem(item.productId));
+                  toast.info('Item removed from cart');
+                }}
+              />
+            ))}
+          </div>
 
-              <div className="flex-1 min-w-0">
-                <Link
-                  href={`/products/${item.slug}`}
-                  className="text-[14px] font-semibold text-warm-900 hover:text-brand-600 transition-colors line-clamp-1"
-                >
-                  {item.name}
-                </Link>
+          {/* Summary */}
+          <aside className="lg:col-span-1">
+            <div className="sticky top-20 space-y-4 rounded-xl border border-warm-200 bg-white p-5 shadow-sm">
+              <h2 className="border-b border-warm-100 pb-3 text-base font-bold text-warm-900">
+                Order summary
+              </h2>
 
-                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-[11px] font-bold text-warm-900">
-                    {formatCurrency(item.discountPrice || item.price)}
-                  </span>
-                  {item.discountPrice && (
-                    <span className="text-[11px] text-warm-400 line-through">{formatCurrency(item.price)}</span>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between mt-3">
-                  <div className="flex items-center border border-warm-200 rounded-lg overflow-hidden bg-white">
-                    <button
-                      onClick={() =>
-                        dispatch(updateQuantity({ productId: item.productId, quantity: item.quantity - 1 }))
-                      }
-                      disabled={item.quantity <= 1}
-                      title={item.quantity <= 1 ? 'Minimum quantity is 1' : 'Decrease quantity'}
-                      className="p-1.5 text-warm-600 hover:bg-warm-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <Minus className="w-2.5 h-2.5" />
-                    </button>
-                    <span className="px-3 py-1 text-[11px] font-bold text-warm-900 min-w-[32px] text-center">
-                      {item.quantity}
-                    </span>
-                    <button
-                      onClick={() =>
-                        dispatch(updateQuantity({ productId: item.productId, quantity: item.quantity + 1 }))
-                      }
-                      className="p-1.5 text-warm-600 hover:bg-warm-50 transition-colors"
-                    >
-                      <Plus className="w-2.5 h-2.5" />
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      dispatch(removeItem(item.productId));
-                      toast.info('Item removed from cart');
-                    }}
-                    className="p-1.5 text-warm-400 hover:text-red-600 rounded-lg transition-colors"
-                    title="Remove item"
-                  >
-                    <Trash2 className="w-2.5 h-2.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Order Summary */}
-        <div className="lg:col-span-1">
-          <div className="bg-white border border-warm-200 rounded-xl p-4 space-y-3 shadow-xs sticky top-24">
-            <h2 className="text-[11px] font-bold text-warm-900 border-b border-warm-100 pb-3">
-              Order Summary
-            </h2>
-
-            {/* Coupon Code Input */}
-            <div>
+              {/* Coupon */}
               {coupon ? (
-                <div className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-200 rounded-md text-[11px]">
-                  <div className="flex items-center gap-2 text-emerald-800 font-semibold">
-                    <Tag className="w-2.5 h-2.5 text-emerald-600" />
-                    <span>{coupon.code} Applied</span>
-                  </div>
+                <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm">
+                  <span className="flex items-center gap-2 font-semibold text-emerald-800">
+                    <Tag className="h-4 w-4 text-emerald-600" />
+                    {coupon.code} applied
+                  </span>
                   <button
+                    type="button"
                     onClick={() => dispatch(removeCoupon())}
-                    className="text-[11px] text-red-600 font-semibold hover:underline"
+                    className="text-xs font-semibold text-red-600 hover:underline"
                   >
                     Remove
                   </button>
                 </div>
               ) : (
-                <div className="space-y-1.5">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleApplyCoupon();
+                  }}
+                  className="space-y-1.5"
+                >
                   <div className="flex gap-2">
-                    <input
-                      type="text"
+                    <Input
                       value={couponCode}
                       onChange={(e) => {
                         setCouponCode(e.target.value.toUpperCase());
                         setCouponError('');
                       }}
-                      placeholder="Coupon Code"
-                      className="flex-1 px-3 py-1,5 bg-white border border-warm-200 rounded-md text-[11px] text-warm-900 uppercase focus:outline-none focus:border-brand-600"
+                      error={couponError}
+                      placeholder="Coupon code"
+                      aria-label="Coupon code"
+                      className="uppercase"
                     />
-                    <button
-                      onClick={handleApplyCoupon}
-                      disabled={couponLoading}
-                      className="px-4 py-1.5 bg-warm-900 text-white text-[11px] font-semibold rounded-md hover:bg-warm-800 transition-colors disabled:opacity-50"
-                    >
+                    <Button type="submit" variant="dark" loading={couponLoading}>
                       Apply
-                    </button>
+                    </Button>
                   </div>
-                  {couponError && <p className="text-[11px] text-red-600 font-medium">{couponError}</p>}
-                </div>
-              )}
-            </div>
-
-            {/* Calculations */}
-            <div className="space-y-2.5 text-[11px] text-warm-700 pt-2 border-t border-warm-100">
-              <div className="flex justify-between">
-                <span>Subtotal ({items.reduce((s, i) => s + i.quantity, 0)} items)</span>
-                <span className="font-semibold text-warm-900">{formatCurrency(subtotal)}</span>
-              </div>
-
-              {discount > 0 && (
-                <div className="flex justify-between text-emerald-700 font-semibold">
-                  <span>Discount ({coupon?.code})</span>
-                  <span>-{formatCurrency(discount)}</span>
-                </div>
+                  {couponError && <p className="text-xs text-red-600">{couponError}</p>}
+                </form>
               )}
 
-              <div className="flex justify-between">
-                <span>Estimated Shipping</span>
-                <span className="font-semibold text-emerald-700">Calculated at Checkout</span>
+              {/* Totals */}
+              <div className="space-y-3 border-t border-warm-100 pt-4 text-sm text-warm-700">
+                <div className="flex justify-between">
+                  <span>Subtotal ({itemCount} items)</span>
+                  <span className="font-semibold text-warm-900">{formatCurrency(subtotal)}</span>
+                </div>
+
+                {discount > 0 && (
+                  <div className="flex justify-between font-semibold text-emerald-700">
+                    <span>Discount ({coupon?.code})</span>
+                    <span>-{formatCurrency(discount)}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between">
+                  <span>Shipping</span>
+                  <span className="text-warm-500">Calculated at checkout</span>
+                </div>
+
+                <div className="flex justify-between border-t border-warm-200 pt-3 text-base font-bold text-warm-900">
+                  <span>Total</span>
+                  <span>{formatCurrency(total)}</span>
+                </div>
               </div>
 
-              <div className="flex justify-between text-sm font-bold text-warm-900 border-t border-warm-200 pt-3">
-                <span>Total</span>
-                <span>{formatCurrency(total)}</span>
-              </div>
+              <Button variant="dark" size="lg" className="w-full" onClick={handleCheckout}>
+                <span>Proceed to checkout</span>
+                <ArrowRight className="h-4 w-4" />
+              </Button>
             </div>
-
-            <button
-              onClick={() => {
-                if (!user) {
-                  setShowAuthModal(true);
-                } else {
-                  router.push('/checkout');
-                }
-              }}
-              className="w-full flex items-center justify-center gap-2 py-2 bg-warm-900 text-white text-[12px] font-semibold rounded-md hover:bg-warm-800 active:scale-[0.99] transition-all shadow-xs"
-            >
-              <span>Proceed to Checkout</span>
-              <ArrowRight className="w-2.5 h-2.5" />
-            </button>
-          </div>
+          </aside>
         </div>
       </div>
 
-      {/* Guest Checkout Modal */}
       <Modal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
-        title="You Are Not Logged In"
+        title="You are not logged in"
       >
         <div className="space-y-4">
-          <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <LogIn className="w-5 h-5 text-amber-600 shrink-0" />
-            <p className="text-[12px] text-amber-900 font-medium leading-relaxed">
-              You are not logged in. Please log in or sign up to proceed to checkout, or click cancel to remain on your cart.
+          <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <LogIn className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <p className="text-sm font-medium leading-relaxed text-amber-900">
+              Please log in or sign up to proceed to checkout, or cancel to stay on your cart.
             </p>
           </div>
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-warm-100">
-            <button
-              type="button"
-              onClick={() => setShowAuthModal(false)}
-              className="px-4 py-2 border border-warm-200 text-[11px] font-semibold rounded-md text-warm-700 hover:bg-warm-100 transition-colors"
-            >
+
+          <div className="flex items-center justify-end gap-2 border-t border-warm-100 pt-4">
+            <Button variant="outline" onClick={() => setShowAuthModal(false)}>
               Cancel
-            </button>
-            <Link
-              href="/login?redirect=/checkout"
-              className="px-4 py-2 bg-warm-900 text-white text-[11px] font-semibold rounded-md hover:bg-warm-800 transition-colors inline-flex items-center gap-1.5 shadow-xs"
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Go to Login / Signup</span>
-            </Link>
+            </Button>
+            <Button href="/login?redirect=/checkout" variant="dark">
+              <LogIn className="h-4 w-4" />
+              <span>Login / Signup</span>
+            </Button>
           </div>
         </div>
       </Modal>
+    </Section>
+  );
+}
+
+function CartItem({ item, onQuantityChange, onRemove }) {
+  const toast = useToast();
+
+  const unitPrice = getEffectivePrice(item);
+  const hasDiscount = unitPrice < Number(item.price);
+  const maxQty = item.stock ?? 99;
+
+  return (
+    <div className="flex items-center gap-4 rounded-xl border border-warm-200 bg-white p-3">
+      <Link
+        href={`/products/${item.slug}`}
+        className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-warm-100 bg-warm-50 sm:h-24 sm:w-24"
+      >
+        {item.image ? (
+          <Image src={item.image} alt={item.name} fill sizes="96px" className="object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-warm-300">
+            <Package className="h-8 w-8" />
+          </div>
+        )}
+      </Link>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <Link
+            href={`/products/${item.slug}`}
+            className="line-clamp-2 text-sm font-semibold text-warm-900 transition-colors hover:text-brand-600"
+          >
+            {item.name}
+          </Link>
+          <IconButton
+            label="Remove item"
+            onClick={onRemove}
+            className="-mr-1 -mt-1 h-8 w-8 hover:bg-red-50 hover:text-red-600"
+          >
+            <Trash2 className="h-4 w-4" />
+          </IconButton>
+        </div>
+
+        <div className="mt-1 flex items-baseline gap-2">
+          <span className="text-sm font-bold text-warm-900">{formatCurrency(unitPrice)}</span>
+          {hasDiscount && (
+            <span className="text-xs text-warm-400 line-through">{formatCurrency(item.price)}</span>
+          )}
+        </div>
+
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <QuantityStepper
+            size="sm"
+            value={item.quantity}
+            max={maxQty}
+            onChange={onQuantityChange}
+            onLimit={() => toast.warning(`Only ${maxQty} ${item.name} available in stock.`)}
+          />
+          <span className="text-sm font-bold text-warm-900">
+            {formatCurrency(unitPrice * item.quantity)}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

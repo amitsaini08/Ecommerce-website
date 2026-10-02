@@ -1,99 +1,58 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase, Review } from '@/lib/db/models';
-import { requireAuth } from '@/lib/auth';
+import { Review } from '@/lib/db/models';
 import { reviewSchema } from '@/lib/validations';
-import { parseAndValidate } from '@/lib/sanitization';
-import { sanitizeMediaUrls, deleteCloudinaryMedia } from '@/lib/cloudinary';
+import { deleteCloudinaryMedia } from '@/lib/cloudinary';
 import { recalcProductRating, sameId, formatReview, getReviewSummary } from '@/lib/reviews';
 import { broadcast } from '@/lib/broadcast';
+import { routeHandler, AppError } from '@/app/api/routeHandler';
 
-const MAX_MEDIA = 4;
-
-export async function PUT(request, { params }) {
-  try {
-    const user = await requireAuth(request);
+export const PUT = routeHandler({
+  auth: true,
+  roles: ['customer', 'admin'],
+  schema: reviewSchema,
+  handler: async (request, { user, data, params }) => {
     const { id } = await params;
-    const body = await request.json().catch(() => ({}));
+    const { rating, comment } = data;
 
-    const validation = parseAndValidate(reviewSchema, body);
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: validation.errors[0]?.message || 'Invalid review data' },
-        { status: 400 }
-      );
-    }
-    const { rating, comment } = validation.sanitizedData;
-
-    await connectToDatabase();
     const existing = await Review.findById(id);
-    if (!existing || !sameId(existing.userId, user?._id)) {
-      return NextResponse.json({ error: 'Review not found or unauthorized' }, { status: 404 });
+    if (!existing || (!sameId(existing.userId, user._id) && user.role !== 'admin')) {
+      throw new AppError('Review not found or unauthorized', 404);
     }
-
-    const current = existing.mediaUrls || [];
-    const removeRequested = Array.isArray(body.removeMedia) ? body.removeMedia : [];
-    const toRemove = removeRequested.filter((u) => current.includes(u));
-    const kept = current.filter((u) => !toRemove.includes(u));
-    const toAdd = sanitizeMediaUrls(body.addMedia)
-      .filter((u) => !current.includes(u))
-      .slice(0, Math.max(0, MAX_MEDIA - kept.length));
 
     existing.rating = rating;
     existing.comment = comment || null;
-    existing.mediaUrls = [...kept, ...toAdd];
+    if (data.mediaUrls) existing.mediaUrls = data.mediaUrls;
     await existing.save();
 
     await recalcProductRating(existing.productId);
-    await deleteCloudinaryMedia(toRemove);
-
     const review = formatReview(existing.toObject());
     const summary = await getReviewSummary(existing.productId);
 
-    broadcast(String(existing.productId), 'review:updated', { review, summary },
-      request.headers.get('x-socket-id'));
-
+    broadcast(String(existing.productId), 'review:updated', { review, summary }, request.headers.get('x-socket-id'));
     return NextResponse.json({ review, summary, message: 'Review updated successfully!' });
-  } catch (error) {
-    if (error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    console.error('Reviews PUT error:', error);
-    return NextResponse.json({ error: 'Failed to update review' }, { status: 500 });
-  }
-}
+  },
+});
 
-export async function DELETE(request, { params }) {
-  try {
-    const user = await requireAuth(request);
+export const DELETE = routeHandler({
+  auth: true,
+  roles: ['customer', 'admin'],
+  handler: async (request, { user, params }) => {
     const { id } = await params;
-
-    await connectToDatabase();
     const existing = await Review.findById(id);
-    if (!existing) {
-      return NextResponse.json({ error: 'Review not found' }, { status: 404 });
-    }
-    if (!sameId(existing.userId, user?._id) && user.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+    if (!existing) throw new AppError('Review not found', 404);
+    if (!sameId(existing.userId, user._id) && user.role !== 'admin') {
+      throw new AppError('Forbidden', 403);
     }
 
-    const { productId } = existing;
-    const mediaToDelete = existing.mediaUrls || [];
-
+    const { productId, mediaUrls } = existing;
     await Review.deleteOne({ _id: id });
     await recalcProductRating(productId);
-    await deleteCloudinaryMedia(mediaToDelete);
+    await deleteCloudinaryMedia(mediaUrls || []);
 
     const summary = await getReviewSummary(productId);
-
-    broadcast(String(productId), 'review:deleted', { reviewId: String(id), summary },
-      request.headers.get('x-socket-id'));
+    broadcast(String(productId), 'review:deleted', { reviewId: String(id), summary }, request.headers.get('x-socket-id'));
 
     return NextResponse.json({ ok: true, summary, message: 'Review deleted successfully!' });
-  } catch (error) {
-    if (error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    console.error('Reviews DELETE error:', error);
-    return NextResponse.json({ error: 'Failed to delete review' }, { status: 500 });
-  }
-}
+  },
+});

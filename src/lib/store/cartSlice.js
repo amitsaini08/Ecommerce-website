@@ -10,25 +10,29 @@ const cartSlice = createSlice({
   initialState,
   reducers: {
     addItem: (state, action) => {
-      const { productId, name, slug, image, price, discountPrice, codAvailable, quantity = 1 } = action.payload;
+      const { productId, name, slug, image, price, discountPrice, stock, codAvailable, quantity = 1 } = action.payload;
       const existing = state.items.find((item) => item.productId === productId);
 
       if (existing) {
-        existing.quantity += quantity;
+        existing.quantity = Math.min(existing.stock, existing.quantity + quantity);
         if (codAvailable !== undefined) existing.codAvailable = codAvailable !== false;
-      } else {
-        state.items.push({
-          productId,
-          name,
-          slug,
-          image,
-          price: Number(price),
-          discountPrice: discountPrice ? Number(discountPrice) : null,
-          codAvailable: codAvailable !== false,
-          quantity,
-        });
+        return;
       }
+
+      state.items.push({
+        productId,
+        name,
+        slug,
+        image,
+        stock,
+        price: Number(price),
+        discountPrice: discountPrice ? Number(discountPrice) : null,
+        codAvailable: codAvailable !== false,
+        quantity: Math.min(quantity, stock),
+      });
+
     },
+
     removeItem: (state, action) => {
       state.items = state.items.filter((item) => item.productId !== action.payload);
     },
@@ -36,7 +40,8 @@ const cartSlice = createSlice({
       const { productId, quantity } = action.payload;
       const item = state.items.find((item) => item.productId === productId);
       if (item) {
-        item.quantity = Math.max(1, Math.floor(Number(quantity) || 1));
+        const normalizedQuantity = Math.max(1, Math.floor(Number(quantity) || 1));
+        item.quantity = Math.min(item.stock, normalizedQuantity);
       }
     },
     clearCart: (state) => {

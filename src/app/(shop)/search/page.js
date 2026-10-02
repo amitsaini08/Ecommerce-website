@@ -275,7 +275,7 @@ function SearchContent() {
               <div className="flex flex-wrap gap-2">
                 {matchingCategories.slice(0, 5).map((cat) => (
                   <Link
-                    key={cat.id}
+                    key={cat._id || cat.id}
                     href={`/categories/${cat.slug}`}
                     className="inline-flex items-center gap-2 px-3 py-1.5 bg-warm-50 border border-warm-200 rounded-lg text-xs font-semibold text-warm-800 hover:border-brand-500 hover:text-brand-600 transition-all shadow-2xs"
                   >
@@ -297,7 +297,7 @@ function SearchContent() {
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-5">
                 {products.map((product) => (
-                  <ProductCard key={product.id} product={product} />
+                  <ProductCard key={product._id || product.id} product={product} />
                 ))}
               </div>
               {pagination.totalPages > 1 && (

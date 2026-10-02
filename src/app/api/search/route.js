@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
-import { connectToDatabase, Category, Product } from "@/lib/db/models";
+import { Category, Product } from "@/lib/db/models";
 import { getAllDescendantIds } from "@/lib/categoryHelpers";
+import { routeHandler } from "@/app/api/routeHandler";
 
-export async function GET(request) {
-  try {
+export const GET = routeHandler({
+  auth: false,
+  handler: async (request) => {
     const { searchParams } = new URL(request.url);
     const q = searchParams.get("q") || searchParams.get("search") || "";
     const page = Math.max(parseInt(searchParams.get("page") || "1"), 1);
@@ -25,9 +27,6 @@ export async function GET(request) {
       });
     }
 
-    await connectToDatabase();
-
-    // Matched Categories for search query chips
     let matchedCategories = [];
     let expandedCategoryIds = [];
 
@@ -66,7 +65,6 @@ export async function GET(request) {
       ];
     }
 
-    // Build product query filter
     const query = { isActive: true };
 
     if (minRating && !isNaN(parseFloat(minRating))) {
@@ -96,77 +94,26 @@ export async function GET(request) {
       }
     }
 
-    if (minPrice || maxPrice) {
-      const min = minPrice !== null && minPrice !== undefined && minPrice !== '' && !isNaN(parseFloat(minPrice)) ? parseFloat(minPrice) : null;
-      const max = maxPrice !== null && maxPrice !== undefined && maxPrice !== '' && !isNaN(parseFloat(maxPrice)) ? parseFloat(maxPrice) : null;
-
-      const effectivePrice = {
-        $cond: [
-          {
-            $and: [
-              { $gt: ['$discountPrice', 0] },
-              { $lt: ['$discountPrice', '$price'] },
-            ],
-          },
-          '$discountPrice',
-          '$price',
-        ],
-      };
-
-      const priceExprs = [];
-      if (min !== null) priceExprs.push({ $gte: [effectivePrice, min] });
-      if (max !== null) priceExprs.push({ $lte: [effectivePrice, max] });
-
-      if (priceExprs.length > 0) {
-        if (!query.$expr) {
-          query.$expr = priceExprs.length === 1 ? priceExprs[0] : { $and: priceExprs };
-        } else {
-          query.$expr = { $and: [query.$expr, ...priceExprs] };
-        }
-      }
-    }
-
     let sortOption = { createdAt: -1 };
     switch (sort) {
-      case 'price-asc':
-        sortOption = { price: 1 };
-        break;
-      case 'price-desc':
-        sortOption = { price: -1 };
-        break;
-      case 'best-sellers':
-        sortOption = { reviewCount: -1 };
-        break;
-      case 'top-rated':
-        sortOption = { ratingAvg: -1 };
-        break;
-      case 'oldest':
-        sortOption = { createdAt: 1 };
-        break;
-      case 'newest':
-      default:
-        sortOption = { createdAt: -1 };
-        break;
+      case 'price-asc': sortOption = { price: 1 }; break;
+      case 'price-desc': sortOption = { price: -1 }; break;
+      case 'best-sellers': sortOption = { reviewCount: -1 }; break;
+      case 'top-rated': sortOption = { ratingAvg: -1 }; break;
+      case 'oldest': sortOption = { createdAt: 1 }; break;
+      case 'newest': default: sortOption = { createdAt: -1 }; break;
     }
 
-    const productList = await Product.find(query)
-      .sort(sortOption)
-      .skip(offset)
-      .limit(limit)
-      .lean();
-
+    const productList = await Product.find(query).sort(sortOption).skip(offset).limit(limit).lean();
     const count = await Product.countDocuments(query);
 
     const sanitizedProducts = productList.map((product) => {
       const { productLink, ...rest } = product;
-      return {
-        ...rest,
-        id: product._id,
-      };
+      return { ...rest, id: String(product._id) };
     });
 
     const sanitizedCategories = matchedCategories.slice(0, 5).map((cat) => ({
-      id: cat._id,
+      _id: String(cat._id),
       name: cat.name,
       slug: cat.slug,
       imageUrl: cat.imageUrl,
@@ -182,8 +129,5 @@ export async function GET(request) {
         totalPages: Math.ceil(count / limit),
       },
     });
-  } catch (error) {
-    console.error("Search API error:", error);
-    return NextResponse.json({ error: "Search failed" }, { status: 500 });
-  }
-}
+  },
+});

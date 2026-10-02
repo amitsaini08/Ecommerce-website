@@ -27,7 +27,7 @@ export default function InvoicePage() {
 
   const handlePrint = useReactToPrint({
     contentRef: invoiceRef,
-    documentTitle: orderData?.order ? `Invoice-${orderData.order.id}` : 'Invoice',
+    documentTitle: orderData?.order ? `Invoice-${orderData.order._id || orderData.order.id}` : 'Invoice',
   });
 
   if (loading) {
@@ -51,6 +51,7 @@ export default function InvoicePage() {
   }
 
   const { order, items = [], address } = orderData;
+  const orderId = order._id || order.id;
 
   const isEligible =
     order.status !== 'cancelled' &&
@@ -71,7 +72,7 @@ export default function InvoicePage() {
         </p>
         <div className="flex justify-center gap-3">
           <Link
-            href={`/orders/${order.id}`}
+            href={`/orders/${orderId}`}
             className="px-4 py-2 bg-warm-900 text-white text-[11px] font-semibold rounded-md hover:bg-warm-800 transition-colors inline-flex items-center gap-1.5"
           >
             <FiArrowLeft className="w-3.5 h-3.5" /> Back to Order Details
@@ -86,7 +87,7 @@ export default function InvoicePage() {
       {/* Action buttons (hidden on print) */}
       <div className="max-w-3xl mx-auto mb-4 flex items-center justify-between print:hidden">
         <Link
-          href={`/orders/${order.id}`}
+          href={`/orders/${orderId}`}
           className="inline-flex items-center gap-1.5 text-[11px] font-medium text-warm-600 hover:text-warm-900"
         >
           <FiArrowLeft className="w-3.5 h-3.5" /> Back to Order
@@ -114,7 +115,7 @@ export default function InvoicePage() {
           </div>
           <div className="sm:text-right">
             <h2 className="text-base font-bold text-warm-900">INVOICE</h2>
-            <p className="text-[10px] text-warm-500 mt-1 font-mono">#{order.id}</p>
+            <p className="text-[10px] text-warm-500 mt-1 font-mono">#{orderId}</p>
             <p className="text-[10px] text-warm-500 mt-1">
               Date: {new Date(order.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
@@ -164,7 +165,7 @@ export default function InvoicePage() {
                 const unitPrice = Number(item.priceAtPurchase);
                 const itemTotal = unitPrice * item.quantity;
                 return (
-                  <tr key={item.id}>
+                  <tr key={item._id || item.id}>
                     <td className="py-2.5 text-warm-900 font-medium">{item.productName || 'Product'}</td>
                     <td className="py-2.5 text-center text-warm-600">{item.quantity}</td>
                     <td className="py-2.5 text-right text-warm-600">{formatCurrency(unitPrice)}</td>

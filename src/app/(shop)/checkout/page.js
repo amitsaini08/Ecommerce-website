@@ -120,8 +120,8 @@ export default function CheckoutPage() {
       if (res.ok) {
         setAddresses(data.addresses || []);
         const def = data.addresses?.find((a) => a.isDefault);
-        if (def) setSelectedAddress(def.id);
-        else if (data.addresses?.length > 0) setSelectedAddress(data.addresses[0].id);
+        if (def) setSelectedAddress(def._id || def.id);
+        else if (data.addresses?.length > 0) setSelectedAddress(data.addresses[0]._id || data.addresses[0].id);
       }
     } catch { }
   }
@@ -176,7 +176,7 @@ export default function CheckoutPage() {
         setAddrErrors({});
         setShowAddForm(false);
         fetchAddresses();
-        setSelectedAddress(data.address.id);
+        setSelectedAddress(data.address._id || data.address.id);
       } else {
         if (data.errors) {
           const map = {};
@@ -474,21 +474,23 @@ export default function CheckoutPage() {
                     No saved addresses. Click above to add one.
                   </p>
                 ) : (
-                  addresses.map((addr) => (
-                    <label
-                      key={addr.id}
-                      className={`flex items-start gap-2 p-3 rounded-md border cursor-pointer transition-all ${selectedAddress === addr.id
-                        ? 'border-warm-900 bg-warm-50/50 shadow-xs'
-                        : 'border-warm-200 hover:border-warm-300'
-                        }`}
-                    >
-                      <input
-                        type="radio"
-                        name="address"
-                        checked={selectedAddress === addr.id}
-                        onChange={() => setSelectedAddress(addr.id)}
-                        className="mt-1 accent-warm-900 w-3.5 h-3.5"
-                      />
+                  addresses.map((addr) => {
+                    const addrId = addr._id || addr.id;
+                    return (
+                      <label
+                        key={addrId}
+                        className={`flex items-start gap-2 p-3 rounded-md border cursor-pointer transition-all ${selectedAddress === addrId
+                          ? 'border-warm-900 bg-warm-50/50 shadow-xs'
+                          : 'border-warm-200 hover:border-warm-300'
+                          }`}
+                      >
+                        <input
+                          type="radio"
+                          name="address"
+                          checked={selectedAddress === addrId}
+                          onChange={() => setSelectedAddress(addrId)}
+                          className="mt-1 accent-warm-900 w-3.5 h-3.5"
+                        />
                       <div>
                         {addr.label && (
                           <span className="text-[10px] font-bold text-warm-900 uppercase tracking-wider block mb-0.5">
@@ -505,7 +507,7 @@ export default function CheckoutPage() {
                         {addr.phone && <p className="text-[10px] text-warm-400 mt-0.5">Phone: {addr.phone}</p>}
                       </div>
                     </label>
-                  ))
+                  )})
                 )}
               </div>
             </div>

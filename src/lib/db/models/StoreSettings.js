@@ -2,7 +2,6 @@ import mongoose from 'mongoose';
 
 const StoreSettingsSchema = new mongoose.Schema(
   {
-    _id: { type: String, required: true },
     storeName: { type: String, default: 'NovaHub', required: true },
     contactEmail: { type: String },
     contactPhone: { type: String },
@@ -13,14 +12,9 @@ const StoreSettingsSchema = new mongoose.Schema(
     codAdvanceAmount: { type: Number, default: 99.0 },
     updatedAt: { type: Date, default: Date.now },
   },
-  { timestamps: false, _id: false }
+  { timestamps: false }
 );
 
-StoreSettingsSchema.virtual('id').get(function () {
-  return this._id;
-});
-StoreSettingsSchema.set('toJSON', { virtuals: true });
-StoreSettingsSchema.set('toObject', { virtuals: true });
 
 export default mongoose.models.StoreSettings ||
   mongoose.model('StoreSettings', StoreSettingsSchema);

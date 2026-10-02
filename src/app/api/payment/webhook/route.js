@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { connectToDatabase, Order, Product } from '@/lib/db/models';
-import { sendPaymentConfirmationEmail } from '@/lib/email';
+import { Order, Product } from '@/lib/db/models';
+import { routeHandler } from '@/app/api/routeHandler';
 
-export async function POST(request) {
-  try {
+export const POST = routeHandler({
+  auth: false,
+  handler: async (request) => {
     const rawBody = await request.text();
     const signature = request.headers.get('x-razorpay-signature');
-
-    const webhookSecret =
-      process.env.RAZORPAY_WEBHOOK_SECRET || process.env.RAZORPAY_KEY_SECRET;
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || process.env.RAZORPAY_KEY_SECRET;
 
     if (webhookSecret && signature) {
       const expectedSignature = crypto
@@ -18,7 +17,6 @@ export async function POST(request) {
         .digest('hex');
 
       if (expectedSignature !== signature) {
-        console.warn('[WEBHOOK] Invalid Razorpay webhook signature');
         return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 400 });
       }
     }
@@ -32,11 +30,8 @@ export async function POST(request) {
       return NextResponse.json({ received: true, note: 'No order ID in payload' });
     }
 
-    await connectToDatabase();
     const order = await Order.findOne({ razorpayOrderId });
-
     if (!order) {
-      console.warn(`[WEBHOOK] Order not found for Razorpay order: ${razorpayOrderId}`);
       return NextResponse.json({ received: true, note: 'Order not found' });
     }
 
@@ -45,35 +40,23 @@ export async function POST(request) {
         order.status = 'confirmed';
         order.paymentStatus = 'paid';
         order.razorpayPaymentId = paymentEntity?.id || order.razorpayPaymentId;
-
         order.statusHistory.push({
-          _id: crypto.randomUUID(),
           status: 'confirmed',
           note: `Payment confirmed via webhook (${event}). Payment ID: ${paymentEntity?.id || 'N/A'}`,
           changedAt: new Date(),
         });
-
         await order.save();
-
-        sendPaymentConfirmationEmail(paymentEntity?.email || 'customer', {
-          ...order.toObject(),
-          id: order._id,
-          razorpayPaymentId: paymentEntity?.id,
-        });
       }
     }
 
     if (event === 'payment.failed') {
       if (order.paymentStatus === 'pending') {
         order.paymentStatus = 'failed';
-
         order.statusHistory.push({
-          _id: crypto.randomUUID(),
           status: order.status,
           note: `Payment failed via webhook (${event}). Stock restored.`,
           changedAt: new Date(),
         });
-
         await order.save();
 
         for (const item of order.items || []) {
@@ -86,8 +69,5 @@ export async function POST(request) {
     }
 
     return NextResponse.json({ received: true });
-  } catch (error) {
-    console.error('Razorpay Webhook Error:', error);
-    return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 });
-  }
-}
+  },
+});

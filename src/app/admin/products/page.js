@@ -193,36 +193,39 @@ export default function AdminProductsPage() {
                 <tr key={i}><td colSpan={7} className="px-3 py-3"><div className="h-8 shimmer rounded" /></td></tr>
               )) : currentProducts.length === 0 ? (
                 <tr><td colSpan={7} className="px-3 py-8 text-center text-warm-400">No products found</td></tr>
-              ) : currentProducts.map(p => (
-                <tr key={p.id} className="hover:bg-warm-50/50">
-                  <td className="px-3 py-2"><div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-md bg-warm-100 overflow-hidden shrink-0 relative">
-                      {p.images?.[0] ? <Image src={p.images[0]} alt="" fill className="object-cover" sizes="32px" /> : <div className="w-full h-full flex items-center justify-center text-warm-400"><Package className="w-4 h-4" /></div>}
-                    </div>
-                    <span className="font-medium text-warm-900 truncate max-w-[180px]">{p.name}</span>
-                  </div></td>
-                  <td className="px-3 py-2 text-warm-700">{formatCurrency(p.discountPrice || p.price)}{p.discountPrice && <span className="text-warm-400 line-through ml-1 text-[10px]">{formatCurrency(p.price)}</span>}</td>
-                  <td className="px-3 py-2"><span className={`font-medium ${p.stock > 0 ? 'text-green-600' : 'text-red-500'}`}>{p.stock}</span></td>
-                  <td className="px-3 py-2 text-warm-500">
-                    {p.categoryNames?.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {p.categoryNames.map((name) => (
-                          <span key={name} className="px-1.5 py-0.5 bg-warm-100 text-warm-600 text-[9px] font-semibold rounded" >
-                            {name}
-                          </span>
-                        ))}
+              ) : currentProducts.map(p => {
+                const productId = p._id || p.id;
+                return (
+                  <tr key={productId} className="hover:bg-warm-50/50">
+                    <td className="px-3 py-2"><div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-md bg-warm-100 overflow-hidden shrink-0 relative">
+                        {p.images?.[0] ? <Image src={p.images[0]} alt="" fill className="object-cover" sizes="32px" /> : <div className="w-full h-full flex items-center justify-center text-warm-400"><Package className="w-4 h-4" /></div>}
                       </div>
-                    ) : ('—')}
-                  </td>
-                  <td className="px-3 py-2">{p.isActive ? <FiCheck className="text-green-500 w-3.5 h-3.5" /> : <FiX className="text-red-400 w-3.5 h-3.5" />}</td>
-                  <td className="px-3 py-2">{p.codAvailable !== false ? <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-green-50 text-green-700 rounded-md">Yes</span> : <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-red-50 text-red-600 rounded-md">No</span>}</td>
-                  <td className="px-3 py-2 text-right"><div className="flex items-center justify-end gap-1">
-                    <Link href={`/admin/products/${p.id}/edit`} className="p-1 text-warm-500 hover:text-brand-600 hover:bg-brand-50 rounded-md transition-colors"><FiEdit className="w-3.5 h-3.5" /></Link>
-                    <button onClick={() => handleDelete(p.id, p.name)} className="p-1 text-warm-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"><FiTrash2 className="w-3.5 h-3.5" /></button>
-                  </div>
-                  </td>
-                </tr>
-              ))}
+                      <span className="font-medium text-warm-900 truncate max-w-[180px]">{p.name}</span>
+                    </div></td>
+                    <td className="px-3 py-2 text-warm-700">{formatCurrency(p.discountPrice || p.price)}{p.discountPrice && <span className="text-warm-400 line-through ml-1 text-[10px]">{formatCurrency(p.price)}</span>}</td>
+                    <td className="px-3 py-2"><span className={`font-medium ${p.stock > 0 ? 'text-green-600' : 'text-red-500'}`}>{p.stock}</span></td>
+                    <td className="px-3 py-2 text-warm-500">
+                      {p.categoryNames?.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {p.categoryNames.map((name) => (
+                            <span key={name} className="px-1.5 py-0.5 bg-warm-100 text-warm-600 text-[9px] font-semibold rounded" >
+                              {name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : ('—')}
+                    </td>
+                    <td className="px-3 py-2">{p.isActive ? <FiCheck className="text-green-500 w-3.5 h-3.5" /> : <FiX className="text-red-400 w-3.5 h-3.5" />}</td>
+                    <td className="px-3 py-2">{p.codAvailable !== false ? <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-green-50 text-green-700 rounded-md">Yes</span> : <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-red-50 text-red-600 rounded-md">No</span>}</td>
+                    <td className="px-3 py-2 text-right"><div className="flex items-center justify-end gap-1">
+                      <Link href={`/admin/products/${productId}/edit`} className="p-1 text-warm-500 hover:text-brand-600 hover:bg-brand-50 rounded-md transition-colors"><FiEdit className="w-3.5 h-3.5" /></Link>
+                      <button onClick={() => handleDelete(productId, p.name)} className="p-1 text-warm-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"><FiTrash2 className="w-3.5 h-3.5" /></button>
+                    </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

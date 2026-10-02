@@ -1,37 +1,26 @@
 import { NextResponse } from 'next/server';
-import { getAuthUser } from '@/lib/auth';
+import { routeHandler, AppError } from '@/app/api/routeHandler';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
-export async function POST(request) {
-  try {
-    const user = await getAuthUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+export const POST = routeHandler({
+  auth: true,
+  roles: ['customer', 'admin'],
+  handler: async (request, { user }) => {
     const formData = await request.formData();
     const file = formData.get('file');
 
     if (!file || typeof file === 'string') {
-      return NextResponse.json({ error: 'No image file provided' }, { status: 400 });
+      throw new AppError('No image file provided', 400);
     }
 
-    // Validate MIME Type
     if (!ALLOWED_MIME_TYPES.includes(file.type.toLowerCase())) {
-      return NextResponse.json(
-        { error: 'Invalid file type. Only JPG, PNG, WEBP, and GIF images are allowed.' },
-        { status: 400 }
-      );
+      throw new AppError('Invalid file type. Only JPG, PNG, WEBP, and GIF images are allowed.', 400);
     }
 
-    // Validate File Size
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: 'File size exceeds maximum limit of 5MB.' },
-        { status: 400 }
-      );
+      throw new AppError('File size exceeds maximum limit of 5MB.', 400);
     }
 
     const bytes = await file.arrayBuffer();
@@ -44,10 +33,9 @@ export async function POST(request) {
     const apiSecret = process.env.CLOUDINARY_API_SECRET;
 
     if (!cloudName || !apiKey || !apiSecret) {
-      return NextResponse.json({ error: 'Cloudinary configuration missing on server' }, { status: 500 });
+      throw new AppError('Cloudinary configuration missing on server', 500);
     }
 
-    // Generate SHA1 Signature
     const timestamp = Math.round(new Date().getTime() / 1000);
     const crypto = await import('crypto');
     const signature = crypto
@@ -69,12 +57,9 @@ export async function POST(request) {
     const uploadData = await uploadRes.json();
 
     if (!uploadRes.ok) {
-      return NextResponse.json({ error: uploadData.error?.message || 'Upload failed' }, { status: 500 });
+      throw new AppError(uploadData.error?.message || 'Upload failed', 500);
     }
 
     return NextResponse.json({ url: uploadData.secure_url, publicId: uploadData.public_id });
-  } catch (error) {
-    console.error('Upload error:', error);
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
-  }
-}
+  },
+});
