@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useToast } from '@/components/ui/Toast';
-import Breadcrumbs from '@/components/ui/Breadcrumbs';
+import { useToast } from '@/components/common/Toast';
+import Breadcrumbs from '@/components/common/Breadcrumbs';
 import { FiMail, FiUser, FiSend, FiPhone, FiMapPin } from 'react-icons/fi';
 import { validateEmailFormat } from '@/lib/inputHelpers';
+import { contactApi } from '@/lib/apiClient/contact';
 
 export default function ContactPage() {
   const toast = useToast();
@@ -51,32 +52,23 @@ export default function ContactPage() {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          email: form.email.trim(),
-          subject: form.subject.trim(),
-          message: form.message.trim(),
-        }),
+      const data = await contactApi.send({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        subject: form.subject.trim(),
+        message: form.message.trim(),
       });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success(data.message || 'Message sent successfully!');
-        setForm({ name: '', email: '', subject: '', message: '' });
-        setFieldErrors({});
+      toast.success(data?.message || 'Message sent successfully!');
+      setForm({ name: '', email: '', subject: '', message: '' });
+      setFieldErrors({});
+    } catch (err) {
+      if (err.errors) {
+        const map = {};
+        err.errors.forEach((e) => { map[e.field] = e.message; });
+        setFieldErrors(map);
       } else {
-        if (data.errors) {
-          const map = {};
-          data.errors.forEach((err) => { map[err.field] = err.message; });
-          setFieldErrors(map);
-        } else {
-          toast.error(data.error || 'Failed to send message');
-        }
+        toast.error(err.message || 'Failed to send message');
       }
-    } catch {
-      toast.error('Network error. Please try again.');
     }
     setLoading(false);
   }

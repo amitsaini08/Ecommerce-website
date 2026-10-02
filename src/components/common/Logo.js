@@ -8,7 +8,7 @@ export default function Logo({ tone = 'light', href = '/', className }) {
     <Link
       href={href}
       className={cn(
-        'shrink-0 text-xl font-extrabold tracking-tight',
+        'shrink-0 text-md font-extrabold tracking-tight',
         dark ? 'text-white' : 'text-warm-900',
         className
       )}

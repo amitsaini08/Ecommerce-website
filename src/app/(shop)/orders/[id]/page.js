@@ -6,10 +6,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useSelector } from 'react-redux';
 import { selectUser } from '@/lib/store/authSlice';
-import { useToast } from '@/components/ui/Toast';
-import Modal from '@/components/ui/Modal';
-import Breadcrumbs from '@/components/ui/Breadcrumbs';
+import { useToast } from '@/components/common/Toast';
+import Modal from '@/components/common/Modal';
+import Breadcrumbs from '@/components/common/Breadcrumbs';
 import { formatCurrency } from '@/lib/utils';
+import { ordersApi } from '@/lib/apiClient/orders';
 import { Frown, Package } from 'lucide-react';
 import Script from 'next/script';
 import {
@@ -52,7 +53,7 @@ export default function OrderDetailPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.Razorpay) {
-      setRazorpayLoaded(true);
+      queueMicrotask(() => setRazorpayLoaded(true));
     }
   }, []);
 
@@ -66,9 +67,8 @@ export default function OrderDetailPage() {
 
   async function fetchOrder() {
     try {
-      const res = await fetch(`/api/orders/${id}`);
-      const data = await res.json();
-      if (res.ok) {
+      const data = await ordersApi.getUserOrderById(id);
+      if (data?.order) {
         setOrder(data.order);
         setItems(data.items || []);
         setHistory(data.history || []);
@@ -86,21 +86,12 @@ export default function OrderDetailPage() {
     }
     setCancelling(true);
     try {
-      const res = await fetch(`/api/orders/${id}/cancel`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: cancelReason }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success(data.message || 'Order cancelled!');
-        setShowCancelModal(false);
-        fetchOrder();
-      } else {
-        toast.error(data.error || 'Failed to cancel order');
-      }
-    } catch {
-      toast.error('Network error');
+      const data = await ordersApi.cancel(id, cancelReason);
+      toast.success(data.message || 'Order cancelled!');
+      setShowCancelModal(false);
+      fetchOrder();
+    } catch (err) {
+      toast.error(err.message || 'Failed to cancel order');
     }
     setCancelling(false);
   }
@@ -113,21 +104,12 @@ export default function OrderDetailPage() {
     }
     setReturning(true);
     try {
-      const res = await fetch(`/api/orders/${id}/return`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: returnReason }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success(data.message || 'Return request submitted!');
-        setShowReturnModal(false);
-        fetchOrder();
-      } else {
-        toast.error(data.error || 'Failed to submit return');
-      }
-    } catch {
-      toast.error('Network error');
+      const data = await ordersApi.return(id, returnReason);
+      toast.success(data.message || 'Return request submitted!');
+      setShowReturnModal(false);
+      fetchOrder();
+    } catch (err) {
+      toast.error(err.message || 'Failed to submit return');
     }
     setReturning(false);
   }
@@ -141,13 +123,7 @@ export default function OrderDetailPage() {
     setRetryingPayment(true);
     const orderId = order._id || order.id;
     try {
-      const res = await fetch(`/api/payment/retry/${orderId}`, { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error || 'Failed to start payment retry');
-        setRetryingPayment(false);
-        return;
-      }
+      const data = await ordersApi.retryPayment(orderId);
 
       const options = {
         key: data.key || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
@@ -158,25 +134,16 @@ export default function OrderDetailPage() {
         order_id: data.razorpayOrderId,
         handler: async function (response) {
           try {
-            const verifyRes = await fetch('/api/payment/verify', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                orderId: orderId,
-              }),
+            await ordersApi.verifyPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              orderId: orderId,
             });
-            const verifyData = await verifyRes.json();
-            if (verifyRes.ok) {
-              toast.success('Payment successful!');
-              fetchOrder();
-            } else {
-              toast.error(verifyData.error || 'Payment verification failed');
-            }
-          } catch {
-            toast.error('Payment verification error');
+            toast.success('Payment successful!');
+            fetchOrder();
+          } catch (err) {
+            toast.error(err.message || 'Payment verification failed');
           }
           setRetryingPayment(false);
         },
@@ -196,8 +163,8 @@ export default function OrderDetailPage() {
         setRetryingPayment(false);
       });
       rzp.open();
-    } catch {
-      toast.error('Error opening payment window');
+    } catch (err) {
+      toast.error(err.message || 'Error opening payment window');
       setRetryingPayment(false);
     }
   }

@@ -5,14 +5,16 @@ import { useParams } from 'next/navigation';
 import { Frown } from 'lucide-react';
 import { getDiscountPercent } from '@/lib/utils';
 import { useProductReviews } from '@/hooks/useProductReviews';
-import Section from '@/components/ui/Section';
+import Section from '@/components/common/Section';
 import Button from '@/components/ui/Button';
-import EmptyState from '@/components/ui/EmptyState';
-import ContentSection from '@/components/ui/ContentSection';
-import Breadcrumbs from '@/components/ui/Breadcrumbs';
+import EmptyState from '@/components/common/EmptyState';
+import ContentSection from '@/components/common/ContentSection';
+import Breadcrumbs from '@/components/common/Breadcrumbs';
 import ProductGallery from '@/components/product/ProductGallery';
 import ProductBuyBox from '@/components/product/ProductBuyBox';
 import ReviewsSection from '@/components/product/ReviewsSection';
+
+import { productsApi } from '@/lib/apiClient/products';
 
 export default function ProductDetailPage() {
   const { slug } = useParams();
@@ -28,9 +30,8 @@ export default function ProductDetailPage() {
     async function loadProduct() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/products/${slug}`, { signal: controller.signal });
-        const data = await res.json();
-        setProduct(res.ok ? data.product : null);
+        const data = await productsApi.getBySlug(slug, { signal: controller.signal });
+        setProduct(data?.product || null);
       } catch (err) {
         if (err.name === 'AbortError') return;
         setProduct(null);

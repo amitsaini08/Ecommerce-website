@@ -4,17 +4,17 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { FolderTree, Package, SlidersHorizontal } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import Section from '@/components/ui/Section';
-import PageHeader from '@/components/ui/PageHeader';
+import Section from '@/components/common/Section';
+import PageHeader from '@/components/common/PageHeader';
 import Button from '@/components/ui/Button';
 import Chip from '@/components/ui/Chip';
-import ActiveFilters from '@/components/ui/ActiveFilters';
-import Drawer from '@/components/ui/Drawer';
-import EmptyState from '@/components/ui/EmptyState';
-import ProductGrid from '@/components/ui/ProductGrid';
-import ProductCard from '@/components/ui/ProductCard';
-import Breadcrumbs from '@/components/ui/Breadcrumbs';
-import FilterPanel from '@/components/ui/FilterPanel';
+import ActiveFilters from '@/components/common/ActiveFilters';
+import Drawer from '@/components/common/Drawer';
+import EmptyState from '@/components/common/EmptyState';
+import ProductGrid from '@/components/product/ProductGrid';
+import ProductCard from '@/components/product/ProductCard';
+import Breadcrumbs from '@/components/common/Breadcrumbs';
+import FilterPanel from '@/components/storefront/FilterPanel';
 
 const SKELETON_COUNT = 8;
 
@@ -23,6 +23,8 @@ const getEffectivePrice = (p) => {
   const discount = Number(p.discountPrice);
   return discount > 0 && discount < price ? discount : price;
 };
+
+import { categoriesApi } from '@/lib/apiClient/categories';
 
 export default function CategoryDetailPage() {
   const { slug } = useParams();
@@ -42,24 +44,20 @@ export default function CategoryDetailPage() {
     const controller = new AbortController();
 
     // naye category par purane filters nahi chahiye
-    setMinPrice('');
-    setMaxPrice('');
-    setMinRating('');
-    setInStockOnly(false);
+    queueMicrotask(() => {
+      setMinPrice('');
+      setMaxPrice('');
+      setMinRating('');
+      setInStockOnly(false);
+    });
 
     async function loadCategory() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/categories/${slug}`, { signal: controller.signal });
-        const data = await res.json();
-
-        if (res.ok) {
-          setCategory(data.category);
-          setSubcategories(data.subcategories || []);
-          setProducts(data.products || []);
-        } else {
-          setCategory(null);
-        }
+        const data = await categoriesApi.getBySlug(slug, { signal: controller.signal });
+        setCategory(data?.category || null);
+        setSubcategories(data?.subcategories || []);
+        setProducts(data?.products || []);
       } catch (err) {
         if (err.name === 'AbortError') return;
         setCategory(null);

@@ -8,7 +8,8 @@ import { addToWishlist, removeFromWishlist, selectIsWishlisted } from '@/lib/sto
 import { selectUser } from '@/lib/store/authSlice';
 import { formatCurrency, getEffectivePrice } from '@/lib/utils';
 import { cn } from '@/lib/cn';
-import { useToast } from '@/components/ui/Toast';
+import { useToast } from '@/components/common/Toast';
+import { wishlistApi } from '@/lib/apiClient/wishlist';
 import StarRating from '@/components/ui/StarRating';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
@@ -37,7 +38,7 @@ export default function ProductBuyBox({ product, rating }) {
       toast.info(`Removed ${product.name} from wishlist`);
       if (user) {
         try {
-          await fetch(`/api/wishlist/${product._id}`, { method: 'DELETE' });
+          await wishlistApi.remove(product._id);
         } catch { }
       }
       return;
@@ -47,11 +48,7 @@ export default function ProductBuyBox({ product, rating }) {
     toast.success(`Added ${product.name} to wishlist!`);
     if (user) {
       try {
-        await fetch('/api/wishlist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productId: product._id }),
-        });
+        await wishlistApi.add(product._id);
       } catch { }
     }
   }

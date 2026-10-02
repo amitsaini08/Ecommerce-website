@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect , useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -12,9 +12,12 @@ import {
   clearCart,
 } from '@/lib/store/cartSlice';
 import { selectUser, selectAuthLoading } from '@/lib/store/authSlice';
-import { useToast } from '@/components/ui/Toast';
-import Breadcrumbs from '@/components/ui/Breadcrumbs';
-import Modal from '@/components/ui/Modal';
+import { useToast } from '@/components/common/Toast';
+import { settingsApi } from '@/lib/apiClient/settings';
+import { profileApi } from '@/lib/apiClient/profile';
+import { ordersApi } from '@/lib/apiClient/orders';
+import Breadcrumbs from '@/components/common/Breadcrumbs';
+import Modal from '@/components/common/Modal';
 import Script from 'next/script';
 import { formatCurrency } from '@/lib/utils';
 import { FiPlus, FiMinus, FiMapPin, FiCreditCard, FiTruck, FiCheck, FiAlertCircle, FiLogIn } from 'react-icons/fi';
@@ -23,6 +26,8 @@ import {
   validatePhoneFormat,
   validatePincodeFormat,
 } from '@/lib/inputHelpers';
+import AddressForm from '@/components/address/AddressForm';
+import Button from '@/components/ui/Button';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -76,7 +81,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.Razorpay) {
-      setRazorpayLoaded(true);
+      queueMicrotask(() => setRazorpayLoaded(true));
     }
   }, []);
 
@@ -95,15 +100,14 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!isCodAvailable && paymentMethod === 'cod') {
-      setPaymentMethod('razorpay');
+      queueMicrotask(() => setPaymentMethod('razorpay'));
     }
   }, [isCodAvailable, paymentMethod]);
 
   async function fetchStoreSettings() {
     try {
-      const res = await fetch('/api/admin/settings');
-      const data = await res.json();
-      if (res.ok && data.settings) {
+      const data = await settingsApi.get();
+      if (data?.settings) {
         setStoreSettings({
           codEnabled: data.settings.codEnabled ?? true,
           shippingFee: Number(data.settings.shippingFee || 0),
@@ -115,9 +119,8 @@ export default function CheckoutPage() {
 
   async function fetchAddresses() {
     try {
-      const res = await fetch('/api/addresses');
-      const data = await res.json();
-      if (res.ok) {
+      const data = await profileApi.getAddresses();
+      if (data) {
         setAddresses(data.addresses || []);
         const def = data.addresses?.find((a) => a.isDefault);
         if (def) setSelectedAddress(def._id || def.id);
@@ -150,46 +153,26 @@ export default function CheckoutPage() {
     addrForm.pincode.length === 6 &&
     (!addrForm.phone || addrForm.phone.length === 10);
 
-  async function handleAddAddress(e) {
-    e.preventDefault();
-    if (!isAddrValid) return;
-
+  async function handleAddAddress(payload) {
     setAddrLoading(true);
     try {
-      const res = await fetch('/api/addresses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          label: addrForm.label.trim(),
-          line1: addrForm.line1.trim(),
-          line2: addrForm.line2.trim(),
-          city: addrForm.city.trim(),
-          state: addrForm.state.trim(),
-          pincode: addrForm.pincode.trim(),
-          phone: addrForm.phone.trim(),
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
+      const data = await profileApi.addAddress(payload);
+      if (data) {
         toast.success('Address added!');
-        setAddrForm({ label: '', line1: '', line2: '', city: '', state: '', pincode: '', phone: '' });
-        setAddrErrors({});
         setShowAddForm(false);
         fetchAddresses();
         setSelectedAddress(data.address._id || data.address.id);
-      } else {
-        if (data.errors) {
-          const map = {};
-          data.errors.forEach((err) => { map[err.field] = err.message; });
-          setAddrErrors(map);
-        } else {
-          toast.error(data.error || 'Failed to add address');
-        }
+        return null;
       }
-    } catch {
-      toast.error('Failed to add address');
+    } catch (err) {
+      if (err.errors) {
+        return Object.fromEntries(err.errors.map((e) => [e.field, e.message]));
+      }
+      toast.error(err.message || 'Failed to add address');
+    } finally {
+      setAddrLoading(false);
     }
-    setAddrLoading(false);
+    return null;
   }
 
   async function handleCheckout() {
@@ -202,23 +185,12 @@ export default function CheckoutPage() {
     try {
       const cartItems = items.map((i) => ({ productId: i.productId, quantity: i.quantity }));
 
-      const createRes = await fetch('/api/payment/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: cartItems,
-          couponCode: coupon?.code || null,
-          addressId: selectedAddress,
-          paymentMethod,
-        }),
+      const createData = await ordersApi.createOrder({
+        items: cartItems,
+        couponCode: coupon?.code || null,
+        addressId: selectedAddress,
+        paymentMethod,
       });
-
-      const createData = await createRes.json();
-      if (!createRes.ok) {
-        toast.error(createData.error || 'Failed to create order');
-        setPaying(false);
-        return;
-      }
 
       console.log("Created order:", createData);
 
@@ -239,27 +211,18 @@ export default function CheckoutPage() {
         order_id: createData.razorpayOrderId,
         handler: async function (response) {
           try {
-            const verifyRes = await fetch('/api/payment/verify', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                orderId: createData.orderId,
-              }),
+            const verifyData = await ordersApi.verifyPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              orderId: createData.orderId,
             });
-            const verifyData = await verifyRes.json();
-            if (verifyRes.ok) {
-              orderPlacedRef.current = true;
-              dispatch(clearCart());
-              toast.success('Payment successful! Order placed.');
-              router.push(`/orders/${verifyData.orderId}`);
-            } else {
-              toast.error(verifyData.error || 'Payment verification failed');
-            }
-          } catch {
-            toast.error('Payment verification error');
+            orderPlacedRef.current = true;
+            dispatch(clearCart());
+            toast.success('Payment successful! Order placed.');
+            router.push(`/orders/${verifyData.orderId}`);
+          } catch (err) {
+            toast.error(err.message || 'Payment verification failed');
           }
           setPaying(false);
         },
@@ -279,8 +242,8 @@ export default function CheckoutPage() {
         setPaying(false);
       });
       rzp.open();
-    } catch {
-      toast.error('Checkout error. Please try again.');
+    } catch (err) {
+      toast.error(err.message || 'Checkout error. Please try again.');
       setPaying(false);
     }
   }
@@ -305,20 +268,10 @@ export default function CheckoutPage() {
             </p>
           </div>
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-warm-100">
-            <button
-              type="button"
-              onClick={() => router.push('/cart')}
-              className="px-4 py-2 border border-warm-200 text-[11px] font-semibold rounded-md text-warm-700 hover:bg-warm-100 transition-colors"
-            >
-              Cancel
-            </button>
-            <Link
-              href="/login?redirect=/checkout"
-              className="px-4 py-2 bg-warm-900 text-white text-[11px] font-semibold rounded-md hover:bg-warm-800 transition-colors inline-flex items-center gap-1.5 shadow-xs"
-            >
-              <FiLogIn className="w-3.5 h-3.5" />
-              <span>Go to Login / Signup</span>
-            </Link>
+            <Button variant="outline" size="sm" onClick={() => router.push('/cart')}>Cancel</Button>
+            <Button variant="dark" size="sm" href="/login?redirect=/checkout">
+              <FiLogIn className="h-3.5 w-3.5" /> Go to Login / Signup
+            </Button>
           </div>
         </div>
       </Modal>
@@ -345,126 +298,18 @@ export default function CheckoutPage() {
                 <h2 className="text-[13px] font-bold text-warm-900 flex items-center gap-1.5">
                   <FiMapPin className="w-3.5 h-3.5 text-warm-900" /> Delivery Address
                 </h2>
-                <button
-                  onClick={() => setShowAddForm(!showAddForm)}
-                  className="text-[11px] font-semibold text-warm-900 hover:underline flex items-center gap-1"
-                >
-                  <FiPlus className="w-3 h-3" /> Add New Address
-                </button>
+                <Button variant="outline" size="sm" onClick={() => setShowAddForm((s) => !s)}>
+                  <FiPlus className="h-3 w-3" /> Add New Address
+                </Button>
               </div>
 
               {/* Add Address Form */}
               {showAddForm && (
-                <form onSubmit={handleAddAddress} className="grid grid-cols-2 gap-2.5 mb-4 p-3.5 bg-warm-50/70 border border-warm-200 rounded-md">
-                  <div className="col-span-2">
-                    <input
-                      value={addrForm.label}
-                      onChange={(e) => handleAddrFieldChange('label', e.target.value)}
-                      placeholder="Label (Home, Office)"
-                      className="w-full px-2.5 py-1.5 border border-warm-200 rounded-md text-[11px] bg-white outline-none focus:ring-2 focus:ring-warm-900/10 focus:border-warm-900 transition-all"
-                    />
-                  </div>
-
-                  <div className="col-span-2">
-                    <input
-                      value={addrForm.line1}
-                      onChange={(e) => handleAddrFieldChange('line1', e.target.value)}
-                      placeholder="Address Line 1 *"
-                      className="w-full px-2.5 py-1.5 border border-warm-200 rounded-md text-[11px] bg-white outline-none focus:ring-2 focus:ring-warm-900/10 focus:border-warm-900 transition-all"
-                      required
-                    />
-                    {addrErrors.line1 && <p className="text-red-600 text-[10px] mt-0.5">{addrErrors.line1}</p>}
-                  </div>
-
-                  <div className="col-span-2">
-                    <input
-                      value={addrForm.line2}
-                      onChange={(e) => handleAddrFieldChange('line2', e.target.value)}
-                      placeholder="Address Line 2"
-                      className="w-full px-2.5 py-1.5 border border-warm-200 rounded-md text-[11px] bg-white outline-none focus:ring-2 focus:ring-warm-900/10 focus:border-warm-900 transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <input
-                      value={addrForm.city}
-                      onChange={(e) => handleAddrFieldChange('city', e.target.value)}
-                      placeholder="City *"
-                      className="w-full px-2.5 py-1.5 border border-warm-200 rounded-md text-[11px] bg-white outline-none focus:ring-2 focus:ring-warm-900/10 focus:border-warm-900 transition-all"
-                      required
-                    />
-                    {addrErrors.city && <p className="text-red-600 text-[10px] mt-0.5">{addrErrors.city}</p>}
-                  </div>
-
-                  <div>
-                    <input
-                      value={addrForm.state}
-                      onChange={(e) => handleAddrFieldChange('state', e.target.value)}
-                      placeholder="State *"
-                      className="w-full px-2.5 py-1.5 border border-warm-200 rounded-md text-[11px] bg-white outline-none focus:ring-2 focus:ring-warm-900/10 focus:border-warm-900 transition-all"
-                      required
-                    />
-                    {addrErrors.state && <p className="text-red-600 text-[10px] mt-0.5">{addrErrors.state}</p>}
-                  </div>
-
-                  <div>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={addrForm.pincode}
-                      onKeyDown={(e) =>
-                        handleNumericKeyDown(e, (msg) => {
-                          setAddrBlockedMsg((prev) => ({ ...prev, pincode: msg }));
-                          setTimeout(() => setAddrBlockedMsg((prev) => ({ ...prev, pincode: '' })), 2000);
-                        })
-                      }
-                      onChange={(e) => handleAddrFieldChange('pincode', e.target.value)}
-                      maxLength={6}
-                      placeholder="Pincode (6 digits) *"
-                      className="w-full px-2.5 py-1.5 border border-warm-200 rounded-md text-[11px] bg-white outline-none focus:ring-2 focus:ring-warm-900/10 focus:border-warm-900 transition-all"
-                      required
-                    />
-                    {addrBlockedMsg.pincode && <p className="text-amber-600 text-[10px] mt-0.5">{addrBlockedMsg.pincode}</p>}
-                    {addrErrors.pincode && <p className="text-red-600 text-[10px] mt-0.5">{addrErrors.pincode}</p>}
-                  </div>
-
-                  <div>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={addrForm.phone}
-                      onKeyDown={(e) =>
-                        handleNumericKeyDown(e, (msg) => {
-                          setAddrBlockedMsg((prev) => ({ ...prev, phone: msg }));
-                          setTimeout(() => setAddrBlockedMsg((prev) => ({ ...prev, phone: '' })), 2000);
-                        })
-                      }
-                      onChange={(e) => handleAddrFieldChange('phone', e.target.value)}
-                      maxLength={10}
-                      placeholder="Phone (10 digits)"
-                      className="w-full px-2.5 py-1.5 border border-warm-200 rounded-md text-[11px] bg-white outline-none focus:ring-2 focus:ring-warm-900/10 focus:border-warm-900 transition-all"
-                    />
-                    {addrBlockedMsg.phone && <p className="text-amber-600 text-[10px] mt-0.5">{addrBlockedMsg.phone}</p>}
-                    {addrErrors.phone && <p className="text-red-600 text-[10px] mt-0.5">{addrErrors.phone}</p>}
-                  </div>
-
-                  <div className="col-span-2 flex gap-2 pt-1">
-                    <button
-                      type="submit"
-                      disabled={addrLoading || !isAddrValid}
-                      className="px-3 py-1.5 bg-warm-900 text-white text-[11px] font-semibold rounded-md hover:bg-warm-800 disabled:opacity-50 transition-colors"
-                    >
-                      {addrLoading ? 'Saving...' : 'Save Address'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddForm(false)}
-                      className="px-3 py-1.5 border border-warm-200 text-[11px] font-semibold rounded-md text-warm-600 hover:bg-warm-100 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
+                <AddressForm
+                  saving={addrLoading}
+                  onSubmit={handleAddAddress}
+                  onCancel={() => setShowAddForm(false)}
+                />
               )}
 
               {/* Address List */}
@@ -491,23 +336,24 @@ export default function CheckoutPage() {
                           onChange={() => setSelectedAddress(addrId)}
                           className="mt-1 accent-warm-900 w-3.5 h-3.5"
                         />
-                      <div>
-                        {addr.label && (
-                          <span className="text-[10px] font-bold text-warm-900 uppercase tracking-wider block mb-0.5">
-                            {addr.label}
-                          </span>
-                        )}
-                        <p className="text-[11px] text-warm-900 font-medium">
-                          {addr.line1}
-                          {addr.line2 ? `, ${addr.line2}` : ''}
-                        </p>
-                        <p className="text-[10px] text-warm-500 mt-0.5">
-                          {addr.city}, {addr.state} — {addr.pincode}
-                        </p>
-                        {addr.phone && <p className="text-[10px] text-warm-400 mt-0.5">Phone: {addr.phone}</p>}
-                      </div>
-                    </label>
-                  )})
+                        <div>
+                          {addr.label && (
+                            <span className="text-[10px] font-bold text-warm-900 uppercase tracking-wider block mb-0.5">
+                              {addr.label}
+                            </span>
+                          )}
+                          <p className="text-[11px] text-warm-900 font-medium">
+                            {addr.line1}
+                            {addr.line2 ? `, ${addr.line2}` : ''}
+                          </p>
+                          <p className="text-[10px] text-warm-500 mt-0.5">
+                            {addr.city}, {addr.state} — {addr.pincode}
+                          </p>
+                          {addr.phone && <p className="text-[10px] text-warm-400 mt-0.5">Phone: {addr.phone}</p>}
+                        </div>
+                      </label>
+                    )
+                  })
                 )}
               </div>
             </div>
@@ -572,7 +418,7 @@ export default function CheckoutPage() {
                   <div>
                     <span className="font-semibold text-amber-900">Cash on Delivery unavailable</span>
                     <p className="mt-0.5 text-amber-700">
-                      Cash on Delivery isn't available for: <span className="font-semibold">{nonCodItems.map((i) => i.name).join(', ')}</span>
+                      Cash on Delivery isn&apos;t available for: <span className="font-semibold">{nonCodItems.map((i) => i.name).join(', ')}</span>
                     </p>
                   </div>
                 </div>
@@ -651,27 +497,17 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              <button
+              <Button
+                variant="dark"
+                className="mt-4 w-full"
+                loading={paying}
+                disabled={(paymentMethod === 'razorpay' && !razorpayLoaded) || !selectedAddress}
                 onClick={handleCheckout}
-                disabled={paying || (paymentMethod === 'razorpay' && !razorpayLoaded) || !selectedAddress}
-                className="mt-4 w-full flex items-center justify-center gap-1.5 py-2 bg-warm-900 text-white font-medium text-[11px] rounded-md hover:bg-warm-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {paying ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <>
-                    {paymentMethod === 'cod' ? (
-                      <>
-                        <FiCheck className="w-2.5 h-2.5" /> Confirm Order (COD)
-                      </>
-                    ) : (
-                      <>
-                        <FiCreditCard className="w-2.5 h-2.5" /> Pay {formatCurrency(total)}
-                      </>
-                    )}
-                  </>
-                )}
-              </button>
+                {paymentMethod === 'cod'
+                  ? <><FiCheck className="h-3 w-3" /> Confirm Order (COD)</>
+                  : <><FiCreditCard className="h-3 w-3" /> Pay {formatCurrency(total)}</>}
+              </Button>
             </div>
           </div>
         </div>

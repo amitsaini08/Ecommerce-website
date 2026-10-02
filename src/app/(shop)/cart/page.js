@@ -17,16 +17,17 @@ import {
   removeCoupon,
 } from '@/lib/store/cartSlice';
 import { formatCurrency, getEffectivePrice } from '@/lib/utils';
-import { useToast } from '@/components/ui/Toast';
-import Section from '@/components/ui/Section';
-import PageHeader from '@/components/ui/PageHeader';
-import EmptyState from '@/components/ui/EmptyState';
-import Breadcrumbs from '@/components/ui/Breadcrumbs';
-import Modal from '@/components/ui/Modal';
+import { useToast } from '@/components/common/Toast';
+import Section from '@/components/common/Section';
+import PageHeader from '@/components/common/PageHeader';
+import EmptyState from '@/components/common/EmptyState';
+import Breadcrumbs from '@/components/common/Breadcrumbs';
+import Modal from '@/components/common/Modal';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import IconButton from '@/components/ui/IconButton';
 import QuantityStepper from '@/components/ui/QuantityStepper';
+import { couponsApi } from '@/lib/apiClient/coupons';
 
 export default function CartPage() {
   const router = useRouter();
@@ -57,29 +58,19 @@ export default function CartPage() {
     setCouponError('');
 
     try {
-      const res = await fetch('/api/coupons/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: couponCode.trim(), subtotal }),
-      });
-      const data = await res.json();
-
-      if (res.ok) {
-        dispatch(
-          applyCoupon({
-            code: data.coupon.code,
-            type: data.coupon.type,
-            value: Number(data.coupon.value),
-            discount: data.discount,
-          })
-        );
-        toast.success('Coupon code applied!');
-        setCouponCode('');
-      } else {
-        setCouponError(data.error || 'Invalid coupon');
-      }
-    } catch {
-      setCouponError('Failed to validate coupon');
+      const data = await couponsApi.validate(couponCode.trim(), subtotal);
+      dispatch(
+        applyCoupon({
+          code: data.coupon.code,
+          type: data.coupon.type,
+          value: Number(data.coupon.value),
+          discount: data.discount,
+        })
+      );
+      toast.success('Coupon code applied!');
+      setCouponCode('');
+    } catch (err) {
+      setCouponError(err.message || 'Failed to validate coupon');
     } finally {
       setCouponLoading(false);
     }

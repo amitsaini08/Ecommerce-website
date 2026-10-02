@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import Section from '@/components/ui/Section';
+import Section from '@/components/common/Section';
 import Button from '@/components/ui/Button';
+
+import { bannersApi } from '@/lib/apiClient/banners';
 
 export default function BannerCarousel() {
   const [banners, setBanners] = useState([]);
@@ -15,9 +17,8 @@ export default function BannerCarousel() {
   useEffect(() => {
     async function fetchActiveBanners() {
       try {
-        const res = await fetch('/api/banners');
-        const data = await res.json();
-        setBanners(data.banners || []);
+        const data = await bannersApi.getAll();
+        setBanners(data?.banners || []);
       } catch {
         setBanners([]);
       }

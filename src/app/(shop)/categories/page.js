@@ -2,9 +2,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { connectToDatabase, Category } from '@/lib/db/models';
 import { ArrowRight, Folder } from 'lucide-react';
-import Section from '@/components/ui/Section';
-import PageHeader from '@/components/ui/PageHeader';
-import EmptyState from '@/components/ui/EmptyState';
+import Section from '@/components/common/Section';
+import PageHeader from '@/components/common/PageHeader';
+import EmptyState from '@/components/common/EmptyState';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +17,8 @@ export default async function CategoriesPage() {
   let allCategories = [];
   try {
     await connectToDatabase();
-    allCategories = await Category.find().sort({ name: 1 }).lean();
+    const raw = await Category.find().sort({ name: 1 }).lean();
+    allCategories = JSON.parse(JSON.stringify(raw));
   } catch { }
 
   const rootCategories = allCategories.filter((c) => !c.parentIds || c.parentIds.length === 0);

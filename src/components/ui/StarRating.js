@@ -1,4 +1,4 @@
-import { FiStar } from 'react-icons/fi';
+import { Star } from 'lucide-react';
 
 export default function StarRating({ rating = 0, count, size = 'sm' }) {
   const stars = [];
@@ -15,20 +15,20 @@ export default function StarRating({ rating = 0, count, size = 'sm' }) {
   for (let i = 0; i < 5; i++) {
     if (i < fullStars) {
       stars.push(
-        <FiStar key={i} className={`${sizes[size]} fill-amber-400 text-amber-400`} />
+        <Star key={i} className={`${sizes[size]} fill-amber-400 text-amber-400`} />
       );
     } else if (i === fullStars && hasHalf) {
       stars.push(
         <div key={i} className="relative">
-          <FiStar className={`${sizes[size]} text-warm-200`} />
+          <Star className={`${sizes[size]} text-warm-200`} />
           <div className="absolute inset-0 overflow-hidden w-1/2">
-            <FiStar className={`${sizes[size]} fill-amber-400 text-amber-400`} />
+            <Star className={`${sizes[size]} fill-amber-400 text-amber-400`} />
           </div>
         </div>
       );
     } else {
       stars.push(
-        <FiStar key={i} className={`${sizes[size]} text-warm-200`} />
+        <Star key={i} className={`${sizes[size]} text-warm-200`} />
       );
     }
   }

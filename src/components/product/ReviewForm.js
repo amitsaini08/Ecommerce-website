@@ -7,7 +7,7 @@ import { cn } from '@/lib/cn';
 import Button from '@/components/ui/Button';
 import Textarea from '@/components/ui/Textarea';
 import StarPicker from '@/components/ui/StarPicker';
-import ImageUpload from '@/components/ui/ImageUpload';
+import ImageUpload from '@/components/common/ImageUpload';
 
 // review = null => naya review, review = object => edit
 export default function ReviewForm({ review, onSubmit, onCancel }) {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { User } from '@/lib/db/models';
-import { routeHandler, AppError } from '@/app/api/routeHandler';
+import { routeHandler } from '@/app/api/routeHandler';
 import { z } from 'zod';
+import { userService } from '@/lib/services/userService';
 
 const updateUserRoleSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
@@ -15,11 +15,9 @@ export const GET = routeHandler({
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
-    const offset = (page - 1) * limit;
 
-    const users = await User.find().select('_id name email role isVerified createdAt').sort({ createdAt: -1 }).skip(offset).limit(limit).lean();
-    const count = await User.countDocuments();
-    return NextResponse.json({ users, pagination: { page, limit, total: count, totalPages: Math.ceil(count / limit) } });
+    const result = await userService.getAdminUsers({ page, limit });
+    return NextResponse.json(result);
   },
 });
 
@@ -28,11 +26,7 @@ export const PATCH = routeHandler({
   roles: ['admin'],
   schema: updateUserRoleSchema,
   handler: async (request, { data }) => {
-    const user = await User.findById(data.userId);
-    if (!user) throw new AppError('User not found', 404);
-
-    user.role = data.role;
-    await user.save();
-    return NextResponse.json({ user });
+    const result = await userService.updateUserRole(data);
+    return NextResponse.json(result);
   },
 });

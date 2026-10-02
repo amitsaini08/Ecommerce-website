@@ -6,14 +6,17 @@ import { Check, X, Shield, User } from 'lucide-react';
 import { selectUser } from '@/lib/store/authSlice';
 import { useAdminList } from '@/hooks/useAdminList';
 import { formatDate } from '@/lib/utils';
-import { useToast } from '@/components/ui/Toast';
-import PageHeader from '@/components/ui/PageHeader';
+import { useToast } from '@/components/common/Toast';
+import PageHeader from '@/components/common/PageHeader';
 import DataTable from '@/components/ui/DataTable';
-import Pagination from '@/components/ui/Pagination';
+import Pagination from '@/components/common/Pagination';
 import Avatar from '@/components/ui/Avatar';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Alert from '@/components/ui/Alert';
+
+import { usersApi } from '@/lib/apiClient/users';
+import { useMutation } from '@/hooks/useMutation';
 
 export default function AdminUsersPage() {
   const toast = useToast();
@@ -24,25 +27,20 @@ export default function AdminUsersPage() {
   );
   const [busyId, setBusyId] = useState(null);
 
+  const roleMutation = useMutation(({ userId, newRole }) =>
+    usersApi.updateRole(userId, newRole)
+  );
+
   async function toggleRole(user) {
     const userId = user._id || user.id;
     const newRole = user.role === 'admin' ? 'customer' : 'admin';
     if (!confirm(`Change ${user.name || user.email} to ${newRole}?`)) return;
 
     setBusyId(userId);
-    try {
-      const res = await fetch('/api/admin/users', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, role: newRole }),
-      });
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) throw new Error(data.error || 'Could not update role');
+    const res = await roleMutation.run({ userId, newRole });
+    if (res) {
       toast.success('Role updated successfully');
       reload();
-    } catch (err) {
-      toast.error(err.message || 'Error updating user role');
     }
     setBusyId(null);
   }

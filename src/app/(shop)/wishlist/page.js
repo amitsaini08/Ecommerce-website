@@ -4,12 +4,13 @@ import Link from 'next/link';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectWishlistItems, clearWishlist } from '@/lib/store/wishlistSlice';
 import { selectUser } from '@/lib/store/authSlice';
-import ProductCard from '@/components/ui/ProductCard';
-import Breadcrumbs from '@/components/ui/Breadcrumbs';
-import { useToast } from '@/components/ui/Toast';
+import ProductCard from '@/components/product/ProductCard';
+import Breadcrumbs from '@/components/common/Breadcrumbs';
+import { useToast } from '@/components/common/Toast';
 import { Heart, Trash2, ArrowRight, ShoppingBag } from 'lucide-react';
-import Section from '@/components/ui/Section';
-import EmptyState from '@/components/ui/EmptyState';
+import Section from '@/components/common/Section';
+import EmptyState from '@/components/common/EmptyState';
+import { wishlistApi } from '@/lib/apiClient/wishlist';
 
 export default function WishlistPage() {
   const dispatch = useDispatch();
@@ -26,7 +27,7 @@ export default function WishlistPage() {
         try {
           await Promise.all(
             wishlistItems.map((item) =>
-              fetch(`/api/wishlist/${item._id || item.id}`, { method: 'DELETE' })
+              wishlistApi.remove(item._id || item.id)
             )
           );
         } catch { }

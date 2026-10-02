@@ -8,7 +8,6 @@ export const GET = routeHandler({
   auth: true,
   roles: ['admin', 'customer'],
   handler: async (request, { user }) => {
-    console.log("GET /api/auth/me called. Authenticated user:", user);
     const authUser = user;
     const dbUser = await User.findById(authUser.id).select('_id name email phone role avatarUrl').lean();
 

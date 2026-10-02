@@ -4,7 +4,7 @@ import "./globals.css";
 import ReduxProvider from "@/components/providers/ReduxProvider";
 import QueryProvider from "@/components/providers/QueryProvider";
 import AuthHydrator from "@/components/providers/AuthHydrator";
-import { ToastProvider } from "@/components/ui/Toast";
+import { ToastProvider } from "@/components/common/Toast";
 
 const inter = Inter({
   subsets: ["latin"],

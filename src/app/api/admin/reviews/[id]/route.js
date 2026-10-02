@@ -1,21 +1,14 @@
 import { NextResponse } from 'next/server';
-import { Review } from '@/lib/db/models';
-import { routeHandler, AppError } from '@/app/api/routeHandler';
-import { recalcProductRating } from '@/lib/reviews';
+import { routeHandler } from '@/app/api/routeHandler';
+import { reviewService } from '@/lib/services/reviewService';
 
 export const PATCH = routeHandler({
   auth: true,
   roles: ['admin'],
   handler: async (request, { params }) => {
     const { id } = await params;
-    const review = await Review.findById(id);
-    if (!review) throw new AppError('Review not found', 404);
-
-    review.isHidden = !review.isHidden;
-    await review.save();
-
-    await recalcProductRating(review.productId);
-    return NextResponse.json({ review: review.toObject() });
+    const result = await reviewService.toggleHideReview(id);
+    return NextResponse.json(result);
   },
 });
 
@@ -24,13 +17,7 @@ export const DELETE = routeHandler({
   roles: ['admin'],
   handler: async (request, { params }) => {
     const { id } = await params;
-    const review = await Review.findById(id);
-    if (!review) throw new AppError('Review not found', 404);
-
-    const productId = review.productId;
-    await Review.deleteOne({ _id: id });
-    await recalcProductRating(productId);
-
-    return NextResponse.json({ message: 'Deleted' });
+    const result = await reviewService.deleteAdminReview(id);
+    return NextResponse.json(result);
   },
 });

@@ -1,7 +1,7 @@
-import SectionHeader from '@/components/ui/SectionHeader';
-import ProductCard from '@/components/ui/ProductCard';
-import Section from '@/components/ui/Section';
-import ProductGrid from '@/components/ui/ProductGrid';
+import SectionHeader from '@/components/common/SectionHeader';
+import ProductCard from '@/components/product/ProductCard';
+import Section from '@/components/common/Section';
+import ProductGrid from '@/components/product/ProductGrid';
 
 export default function NewArrivals({ products = [] }) {
   if (!products?.length) return null;

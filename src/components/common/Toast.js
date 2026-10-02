@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback } from 'react';
-import { FiCheck, FiX, FiAlertTriangle, FiInfo } from 'react-icons/fi';
+import { Check, X, AlertTriangle, Info } from 'lucide-react';
 
 const ToastContext = createContext(null);
 
@@ -52,10 +52,10 @@ export function ToastProvider({ children }) {
 }
 
 const icons = {
-  success: FiCheck,
-  error: FiX,
-  warning: FiAlertTriangle,
-  info: FiInfo,
+  success: Check,
+  error: X,
+  warning: AlertTriangle,
+  info: Info,
 };
 
 const styles = {
@@ -88,7 +88,7 @@ function ToastItem({ toast, onClose }) {
         onClick={onClose}
         className="shrink-0 p-0.5 hover:opacity-70 transition-opacity"
       >
-        <FiX className="w-3 h-3" />
+        <X className="w-3 h-3" />
       </button>
     </div>
   );

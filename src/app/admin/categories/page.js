@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
 import Image from 'next/image';
-import { useToast } from '@/components/ui/Toast';
+import { useToast } from '@/components/common/Toast';
 import { Folder, Plus, Edit2, Trash2, X, Check, ChevronRight, Loader2 } from 'lucide-react';
-import ImageUpload from '@/components/ui/ImageUpload';
-import CategoryTreeSelect from '@/components/ui/CategoryTreeSelect';
+import ImageUpload from '@/components/common/ImageUpload';
+import CategoryTreeSelect from '@/components/admin/CategoryTreeSelect';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import Button from '@/components/ui/Button';
+import { CategoryCreateEditForm } from '@/components/admin/CategoryCreateEditForm';
 
 const categoryFormSchema = z.object({
   name: z.string().min(1, 'Category name is required'),
@@ -20,6 +22,9 @@ const categoryFormSchema = z.object({
 
 const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
+import { categoriesApi } from '@/lib/apiClient/categories';
+import { useMutation } from '@/hooks/useMutation';
+
 export default function AdminCategoriesPage() {
   const toast = useToast();
 
@@ -30,6 +35,8 @@ export default function AdminCategoriesPage() {
   const [editingCategory, setEditingCategory] = useState(null); // null = create mode
   const [parentNameCache, setParentNameCache] = useState({});
   const requestedParentIds = useRef(new Set()); // jo ids ek baar fetch ho chuki, dobara nahi
+
+  const deleteMutation = useMutation((id) => categoriesApi.remove(id));
 
   function openCreate() {
     setEditingCategory(null);
@@ -55,12 +62,12 @@ export default function AdminCategoriesPage() {
     if (missing.length === 0) return;
     missing.forEach((id) => requestedParentIds.current.add(id));
 
-    fetch(`/api/admin/categories/by-ids?ids=${missing.join(',')}`)
-      .then((r) => r.json())
+    categoriesApi
+      .getByIds(missing)
       .then((d) =>
         setParentNameCache((prev) => {
           const next = { ...prev };
-          (d.categories || []).forEach((c) => { next[c._id || c.id] = c.name; });
+          (d?.categories || []).forEach((c) => { next[c._id || c.id] = c.name; });
           return next;
         })
       )
@@ -89,13 +96,11 @@ export default function AdminCategoriesPage() {
     params.set('limit', '5');
 
     try {
-      const res = await fetch(`/api/admin/categories?${params}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed');
+      const data = await categoriesApi.getAdmin(params.toString());
       setChildrenCache((prev) => ({
         ...prev,
         [parentKey]: {
-          items: append ? [...(prev[parentKey]?.items || []), ...data.categories] : data.categories,
+          items: append ? [...(prev[parentKey]?.items || []), ...(data.categories || [])] : data.categories || [],
           nextCursor: data.nextCursor,
           loading: false,
           loadingMore: false,
@@ -125,14 +130,10 @@ export default function AdminCategoriesPage() {
 
   async function handleDelete(id, name) {
     if (!confirm(`Delete "${name}"?`)) return;
-    try {
-      const res = await fetch(`/api/admin/categories/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        toast.success('Category deleted');
-        refreshTree();
-      } else toast.error('Failed to delete category');
-    } catch {
-      toast.error('Error deleting category');
+    const res = await deleteMutation.run(id);
+    if (res) {
+      toast.success('Category deleted');
+      refreshTree();
     }
   }
 
@@ -378,159 +379,3 @@ function SkeletonRow({ depth = 0 }) {
   );
 }
 
-function CategoryCreateEditForm({ category, onClose, onSaved }) {
-  const toast = useToast();
-  const editingId = category?._id || category?.id || null;
-
-  const [form, setForm] = useState({
-    imageUrl: category?.imageUrl || '',
-    parentIds: category?.parentIds || [],
-  });
-  const [saving, setSaving] = useState(false);
-  const [invalidParentIds, setInvalidParentIds] = useState(new Set());
-
-  const { register, setValue, formState: { errors }, handleSubmit } = useForm({
-    resolver: zodResolver(categoryFormSchema),
-    defaultValues: { name: category?.name || '', slug: category?.slug || '' },
-  });
-
- 
-  useEffect(() => {
-    if (!editingId) return;
-    const controller = new AbortController();
-    fetch(`/api/admin/categories/${editingId}/descendants`, { signal: controller.signal })
-      .then((r) => r.json())
-      .then((d) => setInvalidParentIds(new Set(d.descendantIds || [])))
-      .catch(() => {});
-    return () => controller.abort();
-  }, [editingId]);
-
-  const excludeIds = useMemo(
-    () => new Set([editingId, ...invalidParentIds].filter(Boolean)),
-    [editingId, invalidParentIds]
-  );
-
-  async function onSubmit(data) {
-    setSaving(true);
-    try {
-      const url = editingId ? `/api/admin/categories/${editingId}` : '/api/admin/categories';
-      const res = await fetch(url, {
-        method: editingId ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, imageUrl: form.imageUrl, parentIds: form.parentIds || [] }),
-      });
-      if (res.ok) {
-        toast.success(editingId ? 'Category updated!' : 'Category created!');
-        onSaved(); // parent: form band + tree refresh
-        return;
-      }
-      const d = await res.json();
-      toast.error(
-        d.error?.includes('cycle')
-          ? 'This category list may be out of date — please refresh and try again.'
-          : d.error || 'Failed'
-      );
-    } catch {
-      toast.error('Network error');
-    }
-    setSaving(false);
-  }
-
-  const handleSlugChange = (e) => {
-    setValue('slug', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''), {
-      shouldValidate: true,
-      shouldDirty: true,
-    });
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="w-full max-w-md bg-white border border-warm-200 rounded-md shadow-xl p-4 space-y-3 animate-fadeIn"
-      >
-        <div className="flex items-center justify-between border-b border-warm-100 pb-2">
-          <h3 className="font-bold text-warm-900 text-[13px]">
-            {editingId ? 'Edit Category' : 'Create New Category'}
-          </h3>
-          <button type="button" onClick={onClose} className="p-1 text-warm-400 hover:text-warm-900 rounded-md">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-[10px] font-semibold text-warm-700 mb-1">Category Name *</label>
-            <input
-              type="text"
-              {...register('name', {
-                // edit mode me slug auto-overwrite nahi (URLs na tootein). Chahiye to guard hata do.
-                onChange: (e) => {
-                  if (!editingId) setValue('slug', slugify(e.target.value), { shouldValidate: true });
-                },
-              })}
-              placeholder="e.g. Footwear"
-              className="w-full px-2.5 py-1.5 bg-white border border-warm-200 rounded-md text-[11px] text-warm-900 focus:outline-none focus:border-brand-600"
-            />
-            {errors.name && <span className="text-[11px] text-red-600">{errors.name.message}</span>}
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-semibold text-warm-700 mb-1">URL Slug *</label>
-            <input
-              type="text"
-              {...register('slug', { onChange: handleSlugChange })}
-              placeholder="footwear"
-              className="w-full px-2.5 py-1.5 bg-white border border-warm-200 rounded-md text-[11px] text-warm-900 font-mono focus:outline-none focus:border-brand-600"
-            />
-            {errors.slug && <span className="text-[11px] text-red-600">{errors.slug.message}</span>}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <label className="block text-[10px] font-semibold text-warm-700 mb-1">Parent Category</label>
-          <CategoryTreeSelect
-            value={form.parentIds}
-            onChange={(ids) => setForm((f) => ({ ...f, parentIds: ids }))}
-            excludeIds={excludeIds}
-            placeholder="Select parent categories..."
-          />
-        </div>
-
-        <div>
-          <ImageUpload
-            uploadType="category-image"
-            value={form.imageUrl ? [form.imageUrl] : []}
-            onChange={(urls) =>
-              setForm((f) => ({ ...f, imageUrl: Array.isArray(urls) ? urls[0] || '' : urls }))
-            }
-            multiple={false}
-            label="Category Cover Image"
-          />
-        </div>
-
-        <div className="flex justify-end gap-2 pt-1.5 border-t border-warm-100">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-1.5 border border-warm-200 text-warm-700 text-[11px] font-semibold rounded-md hover:bg-warm-50 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-3.5 py-1.5 bg-warm-900 text-white text-[11px] font-semibold rounded-md hover:bg-warm-800 transition-all flex items-center gap-1.5 disabled:opacity-60"
-          >
-            {saving ? (
-              <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <Check className="w-3.5 h-3.5" />
-            )}
-            <span>{editingId ? 'Update Category' : 'Save Category'}</span>
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}

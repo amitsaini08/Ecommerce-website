@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
-import { FiUser, FiLogOut, FiPackage, FiSettings } from 'react-icons/fi';
+import { User, LogOut, Package, Settings } from 'lucide-react';
 import { selectUser, clearUser } from '@/lib/store/authSlice';
 import Dropdown from '@/components/ui/Dropdown';
 import MenuItem from '@/components/ui/MenuItem';
@@ -38,7 +38,7 @@ export default function AccountMenu() {
           onClick={() => setOpen((o) => !o)}
           className="flex h-9 w-9 items-center justify-center rounded-full text-warm-600 transition-colors hover:bg-warm-50 hover:text-warm-900"
         >
-          {user ? <Avatar user={user} size="sm" /> : <FiUser className="h-5 w-5" />}
+          {user ? <Avatar user={user} size="sm" /> : <User className="h-5 w-5" />}
         </button>
       }
     >
@@ -53,19 +53,19 @@ export default function AccountMenu() {
           </div>
 
           {user.role === 'admin' && (
-            <MenuItem href="/admin" icon={FiSettings} onClick={close}>
+            <MenuItem href="/admin" icon={Settings} onClick={close}>
               Admin Dashboard
             </MenuItem>
           )}
-          <MenuItem href="/profile" icon={FiUser} onClick={close}>
+          <MenuItem href="/profile" icon={User} onClick={close}>
             My Profile
           </MenuItem>
-          <MenuItem href="/orders" icon={FiPackage} onClick={close}>
+          <MenuItem href="/orders" icon={Package} onClick={close}>
             My Orders
           </MenuItem>
 
           <div className="mt-1 border-t border-warm-100 pt-1">
-            <MenuItem icon={FiLogOut} danger onClick={handleLogout}>
+            <MenuItem icon={LogOut} danger onClick={handleLogout}>
               Sign Out
             </MenuItem>
           </div>

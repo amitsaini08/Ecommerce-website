@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSelector } from 'react-redux';
-import { FiSearch, FiHeart, FiShoppingCart, FiMenu, FiX } from 'react-icons/fi';
+import { Search, Heart, ShoppingBag, Menu, X } from 'lucide-react';
 import { selectCartItemCount } from '@/lib/store/cartSlice';
 import { selectWishlistItemCount } from '@/lib/store/wishlistSlice';
 import { NAV_LINKS } from '@/lib/constants/nav';
 import { cn } from '@/lib/cn';
-import Container from '@/components/ui/Container';
+import Container from '@/components/common/Container';
 import IconButton from '@/components/ui/IconButton';
 import NavLink from '@/components/ui/NavLink';
 import CategoriesMenu from './CategoriesMenu';
@@ -61,7 +61,7 @@ export default function Header() {
             {/* Actions */}
             <div className="flex items-center gap-1">
               <IconButton label="Search" onClick={() => setSearchOpen(true)}>
-                <FiSearch className="h-5 w-5" />
+                <Search className="h-5 w-5" />
               </IconButton>
 
               <IconButton
@@ -71,13 +71,13 @@ export default function Header() {
                 badgeTone="rose"
                 className="hidden sm:inline-flex"
               >
-                <FiHeart className="h-5 w-5" />
+                <Heart className="h-5 w-5" />
               </IconButton>
 
               <AccountMenu />
 
               <IconButton href="/cart" label="Cart" count={cartCount}>
-                <FiShoppingCart className="h-5 w-5" />
+                <ShoppingBag className="h-5 w-5" />
               </IconButton>
 
               <IconButton
@@ -85,7 +85,7 @@ export default function Header() {
                 onClick={() => setMobileOpen((o) => !o)}
                 className="lg:hidden"
               >
-                {mobileOpen ? <FiX className="h-5 w-5" /> : <FiMenu className="h-5 w-5" />}
+                {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </IconButton>
             </div>
           </div>

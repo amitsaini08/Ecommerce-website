@@ -22,8 +22,8 @@ import {
 } from 'lucide-react';
 import { selectUser, clearUser } from '@/lib/store/authSlice';
 import { cn } from '@/lib/cn';
-import Logo from '@/components/ui/Logo';
-import Container from '@/components/ui/Container';
+import Logo from '@/components/common/Logo';
+import Container from '@/components/common/Container';
 import Avatar from '@/components/ui/Avatar';
 import IconButton from '@/components/ui/IconButton';
 import Badge from '@/components/ui/Badge';
@@ -58,7 +58,7 @@ export default function AdminLayout({ children }) {
 
   // page badalte hi mobile sidebar band
   useEffect(() => {
-    setSidebarOpen(false);
+    queueMicrotask(() => setSidebarOpen(false));
   }, [pathname]);
 
   async function handleLogout() {
@@ -83,15 +83,14 @@ export default function AdminLayout({ children }) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-60 flex-col bg-warm-900 text-white transition-transform duration-300',
+          'fixed inset-y-0 left-0 z-50 flex w-50 flex-col bg-warm-900 text-white transition-transform duration-300',
           'lg:static lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        )}
-      >
+        )}>
         <div className="flex shrink-0 items-center justify-between border-b border-warm-800 px-4 py-4">
           <div className="flex items-center gap-2">
             <Logo tone="dark" href="/admin" />
-            <Badge className="bg-brand-500/20 uppercase tracking-wide text-brand-300">Admin</Badge>
+            <Badge className="bg-brand-500/20 uppercase text-[9px] tracking-wide text-brand-300">Admin</Badge>
           </div>
           <IconButton
             label="Close menu"
@@ -102,7 +101,6 @@ export default function AdminLayout({ children }) {
           </IconButton>
         </div>
 
-        {/* Sirf ye hissa scroll hota hai */}
         <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
           {NAV_ITEMS.map((item) => (
             <NavItem
@@ -150,10 +148,10 @@ export default function AdminLayout({ children }) {
 
             <div className="ml-auto flex items-center gap-3">
               <div className="hidden text-right sm:block">
-                <p className="text-sm font-semibold leading-tight text-warm-900">{user.name}</p>
-                <p className="text-xs text-warm-500">{user.email}</p>
+                <p className="text-xs font-semibold leading-tight text-warm-900">{user.name}</p>
+                <p className="text-[14px] text-warm-500">{user.email}</p>
               </div>
-              <Avatar user={user} size="md" />
+              <Avatar user={user} size="sm" />
             </div>
           </Container>
         </header>
@@ -166,10 +164,10 @@ export default function AdminLayout({ children }) {
   );
 }
 
-// Sirf is layout ka helper hai, shared component nahi
+
 function NavItem({ href, icon: Icon, active, danger, onClick, children }) {
   const classes = cn(
-    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors',
     active
       ? 'bg-brand-600 text-white shadow-sm'
       : danger

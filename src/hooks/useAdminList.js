@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
+import { api } from '@/lib/apiClient/client';
+
 // endpoint: '/api/admin/users', key: response mein list ka naam ('users')
 export function useAdminList(endpoint, key) {
   const [page, setPage] = useState(1);
@@ -13,16 +15,13 @@ export function useAdminList(endpoint, key) {
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
+    queueMicrotask(() => setLoading(true));
 
     (async () => {
       try {
-        const res = await fetch(`${endpoint}?page=${page}`, { signal: controller.signal });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || 'Failed to load data');
-
-        setItems(data[key] || []);
-        setPagination(data.pagination || { page, totalPages: 1 });
+        const data = await api.get(`${endpoint}?page=${page}`, { signal: controller.signal });
+        setItems(data?.[key] || []);
+        setPagination(data?.pagination || { page, totalPages: 1 });
         setError('');
       } catch (err) {
         if (err.name === 'AbortError') return;

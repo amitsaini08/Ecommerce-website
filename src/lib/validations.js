@@ -81,14 +81,14 @@ export const productSchema = z.object({
   isActive: z.boolean().default(true),
   codAvailable: z.boolean().default(true),
   productLink: z.string().optional().nullable().or(z.literal('')),
-  specifications: z.array(z.object({ name: z.string(), value: z.string() })).default([]),
+  specifications: z.array(z.object({ label: z.string(), value: z.string() })).default([]),
 });
 
 export const categorySchema = z.object({
   name: z.string().trim().min(1, 'Category name is required').max(255),
   slug: z.string().trim().min(1, 'Slug is required').max(255),
   imageUrl: z.string().url().optional().nullable().or(z.literal('')),
-  parentId: z.string().optional().nullable(),
+  parentIds: z.array(z.string()).default([]),
 });
 
 export const couponSchema = z.object({

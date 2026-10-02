@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { FiX } from 'react-icons/fi';
+import { X } from 'lucide-react';
 
 export default function Modal({
   isOpen,
@@ -70,7 +70,7 @@ export default function Modal({
                 className="p-2 text-warm-400 hover:text-warm-600 hover:bg-warm-100 rounded-lg transition-colors ml-auto"
                 aria-label="Close modal"
               >
-                <FiX className="w-5 h-5" />
+                <X className="w-5 h-5" />
               </button>
             )}
           </div>

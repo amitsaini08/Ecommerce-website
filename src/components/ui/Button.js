@@ -29,7 +29,7 @@ export default function Button({
   ...props
 }) {
   const classes = cn(
-    'inline-flex items-center justify-center gap-1.5 font-semibold transition-all',
+    'inline-flex items-center  justify-center gap-1.5 font-semibold transition-all',
     'active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50',
     pill ? 'rounded-full' : 'rounded-lg',
     variants[variant],

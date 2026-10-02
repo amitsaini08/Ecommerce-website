@@ -5,7 +5,7 @@ const CategorySchema = new mongoose.Schema(
     name: { type: String, required: true },
     slug: { type: String, required: true, unique: true },
     imageUrl: { type: String },
-    parentIds: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: [] },
+    parentIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }],
     createdAt: { type: Date, default: Date.now },
     isRoot: { type: Boolean, default: false },
   },

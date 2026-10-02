@@ -11,7 +11,7 @@ import { setUser } from '@/lib/store/authSlice';
 import { selectWishlistItems } from '@/lib/store/wishlistSlice';
 import { syncWishlistOnAuth } from '@/lib/store/syncWishlist';
 import { loginSchema } from '@/lib/validations';
-import AuthCard from '@/components/ui/AuthCard';
+import AuthCard from '@/components/auth/AuthCard';
 import Field from '@/components/ui/Field';
 import Input from '@/components/ui/Input';
 import Alert from '@/components/ui/Alert';

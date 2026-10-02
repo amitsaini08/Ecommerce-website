@@ -20,13 +20,17 @@ async function getHomepageData() {
       Product.find({ isActive: true }).sort({ reviewCount: -1 }).limit(8).lean(),
     ]);
 
+    const plainCategories = JSON.parse(JSON.stringify(allCategories));
+    const plainNewArrivals = JSON.parse(JSON.stringify(newArrivals));
+    const plainBestSellers = JSON.parse(JSON.stringify(bestSellers));
+
     return {
-      categories: allCategories.map((c) => ({ ...c, id: c._id })),
-      newArrivals: newArrivals.map((p) => {
+      categories: plainCategories.map((c) => ({ ...c, id: c._id })),
+      newArrivals: plainNewArrivals.map((p) => {
         const { productLink, ...rest } = p;
         return { ...rest, id: p._id };
       }),
-      bestSellers: bestSellers.map((p) => {
+      bestSellers: plainBestSellers.map((p) => {
         const { productLink, ...rest } = p;
         return { ...rest, id: p._id };
       }),

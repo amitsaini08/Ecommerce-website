@@ -1,4 +1,5 @@
 import { setWishlist, clearWishlist } from './wishlistSlice';
+import { wishlistApi } from '@/lib/apiClient/wishlist';
 
 /**
  * Merges guest wishlist items with server DB wishlist and loads user DB wishlist
@@ -10,11 +11,7 @@ export async function syncWishlistOnAuth(dispatch, guestWishlistItems = []) {
     if (Array.isArray(guestWishlistItems) && guestWishlistItems.length > 0) {
       const productIds = guestWishlistItems.map((item) => String(item._id || item.id || '')).filter(Boolean);
       if (productIds.length > 0) {
-        await fetch('/api/wishlist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productIds }),
-        });
+        await wishlistApi.sync(productIds);
       }
     }
   } catch (err) {
@@ -24,9 +21,8 @@ export async function syncWishlistOnAuth(dispatch, guestWishlistItems = []) {
   }
 
   try {
-    const wishlistRes = await fetch('/api/wishlist');
-    if (wishlistRes.ok) {
-      const wishlistData = await wishlistRes.json();
+    const wishlistData = await wishlistApi.get();
+    if (wishlistData?.items) {
       dispatch(setWishlist(wishlistData.items || []));
     }
   } catch (err) {

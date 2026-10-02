@@ -3,12 +3,14 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useToast } from '@/components/ui/Toast';
-import Pagination from '@/components/ui/Pagination';
+import { useToast } from '@/components/common/Toast';
+import Pagination from '@/components/common/Pagination';
 import { Package, X } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { FiPlus, FiEdit, FiTrash2, FiSearch, FiCheck, FiX } from 'react-icons/fi';
 import CustomSelect from '@/components/ui/CustomSelect';
+import DataTable from '@/components/ui/DataTable';
+import Button from '@/components/ui/Button';
 
 const statusOptions = [
   { value: '', label: 'All Status' },
@@ -29,6 +31,9 @@ const stockOptions = [
   { value: 'out', label: 'Out of Stock' },
 ];
 
+import { productsApi } from '@/lib/apiClient/products';
+import { useMutation } from '@/hooks/useMutation';
+
 let pagePaginationCache = { page: 1, totalPages: 1, total: 0 };
 
 export default function AdminProductsPage() {
@@ -42,6 +47,8 @@ export default function AdminProductsPage() {
   const [codFilter, setCodFilter] = useState('');
   const [stockFilter, setStockFilter] = useState('');
 
+  const deleteMutation = useMutation((id) => productsApi.remove(id));
+
   useEffect(() => {
     const timer = setTimeout(() => { setSearch(searchInput) }, 400);
     return () => clearTimeout(timer);
@@ -54,22 +61,6 @@ export default function AdminProductsPage() {
   const filterKey = JSON.stringify([search, statusFilter, codFilter, stockFilter]);
   const prevFilterKey = useRef(filterKey);
 
-  useEffect(() => {
-    if (prevFilterKey.current === filterKey) return;
-    prevFilterKey.current = filterKey;
-    setPagination((prev) => ({ ...prev, page: 1 }));
-    setProducts({});
-  }, [filterKey]);
-
-  useEffect(() => {
-    if (products[pagination.page]) {
-      setLoading(false);
-      return;
-    }
-    fetchProducts(pagination.page);
-  }, [pagination.page,products, search, statusFilter, codFilter, stockFilter]);
-
-
   async function fetchProducts(page) {
     setLoading(true);
     try {
@@ -79,49 +70,161 @@ export default function AdminProductsPage() {
       if (codFilter) params.set('codAvailable', codFilter);
       if (stockFilter) params.set('stockStatus', stockFilter);
 
-      const res = await fetch(`/api/admin/products?${params}`);
-      const data = await res.json();
-      if (res.ok) {
-        setProducts((prev) => ({ ...prev, [page]: data.products }));
-        setPagination((prev) => ({
-          ...prev,
-          totalPages: data.pagination.totalPages,
-          total: data.pagination.total,
-        }));
-      }
+      const data = await productsApi.getAdmin(params.toString());
+      setProducts((prev) => ({ ...prev, [page]: data.products }));
+      setPagination((prev) => ({
+        ...prev,
+        totalPages: data.pagination.totalPages,
+        total: data.pagination.total,
+      }));
     } catch { }
     setLoading(false);
   }
 
+  useEffect(() => {
+    if (prevFilterKey.current === filterKey) return;
+    prevFilterKey.current = filterKey;
+    queueMicrotask(() => {
+      setPagination((prev) => ({ ...prev, page: 1 }));
+      setProducts({});
+    });
+  }, [filterKey]);
+
+  useEffect(() => {
+    if (products[pagination.page]) {
+      queueMicrotask(() => setLoading(false));
+      return;
+    }
+    queueMicrotask(() => fetchProducts(pagination.page));
+  }, [pagination.page, products, search, statusFilter, codFilter, stockFilter]);
+
 
   async function handleDelete(id, name) {
     if (!confirm(`Delete "${name}"?`)) return;
-    try {
-      const res = await fetch(`/api/admin/products/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        toast.success('Product deleted');
-        setProducts({});
+    const res = await deleteMutation.run(id);
+    if (res) {
+      toast.success('Product deleted');
+      setProducts({});
+      if(currentProducts.length === 1 && pagination.page > 1){
+        setPagination((prev) => ({ ...prev, page: prev.page - 1 }));
       }
-      else toast.error('Failed to delete');
-    } catch { toast.error('Error'); }
+    }
   }
 
   function clearFilters() {
     setStatusFilter('');
     setCodFilter("");
     setStockFilter("");
+    setSearchInput('');
+     setSearch('');
   }
 
-  const hasActiveFilters = Boolean(statusFilter || codFilter || stockFilter);
+  const columns = [
+    {
+      key: 'product',
+      header: 'Product',
+      render: (p) => (
+        <div className="flex items-center gap-2">
+          <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md bg-warm-100">
+            {p.images?.[0] ? (
+              <Image src={p.images[0]} alt="" fill className="object-cover" sizes="32px" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-warm-400">
+                <Package className="h-4 w-4" />
+              </div>
+            )}
+          </div>
+          <span className="max-w-[180px] truncate font-medium text-warm-900">{p.name}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'price',
+      header: 'Price',
+      render: (p) => (
+        <span className="text-warm-700">
+          {formatCurrency(p.discountPrice || p.price)}
+          {p.discountPrice && (
+            <span className="ml-1 text-xs text-warm-400 line-through">{formatCurrency(p.price)}</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'stock',
+      header: 'Stock',
+      render: (p) => (
+        <span className={`font-medium ${p.stock > 0 ? 'text-green-600' : 'text-red-500'}`}>{p.stock}</span>
+      ),
+    },
+    {
+      key: 'category',
+      header: 'Category',
+      render: (p) =>
+        p.categoryNames?.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {p.categoryNames.map((n) => (
+              <span key={n} className="rounded bg-warm-100 px-1.5 py-0.5 text-[10px] font-semibold text-warm-600">
+                {n}
+              </span>
+            ))}
+          </div>
+        ) : (
+          '—'
+        ),
+    },
+    {
+      key: 'active',
+      header: 'Active',
+      render: (p) =>
+        p.isActive ? <FiCheck className="h-4 w-4 text-green-500" /> : <FiX className="h-4 w-4 text-red-400" />,
+    },
+    {
+      key: 'cod',
+      header: 'COD',
+      render: (p) =>
+        p.codAvailable !== false ? (
+          <span className="rounded-md bg-green-50 px-1.5 py-0.5 text-xs font-semibold text-green-700">Yes</span>
+        ) : (
+          <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-xs font-semibold text-red-600">No</span>
+        ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      render: (p) => {
+        const id = p._id || p.id;
+        return (
+          <div className="flex items-center justify-end gap-1.5">
+            <Button variant="outline" size="sm" href={`/admin/products/${id}/edit`} aria-label="Edit product">
+              <FiEdit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleDelete(id, p.name)}
+              aria-label="Delete product"
+              className="text-red-600 hover:bg-red-50"
+            >
+              <FiTrash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
+    },
+  ];
+
+  const hasActiveFilters = Boolean(statusFilter || codFilter || stockFilter || search);
   const currentProducts = products[pagination.page] || [];
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-base font-bold text-warm-900">Products</h1>
-        <Link href="/admin/products/new" className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 text-white text-[11px] font-medium rounded-md hover:bg-brand-600 transition-colors">
-          <FiPlus className="w-3.5 h-3.5" /> Add Product
-        </Link>
+        <Button variant="dark" size="sm" href="/admin/products/new">
+          <FiPlus className="h-3.5 w-3.5" /> Add Product
+        </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -176,7 +279,7 @@ export default function AdminProductsPage() {
         </button>
       </div>
 
-      <div className="bg-white rounded-md border border-warm-100 overflow-hidden">
+      {/* <div className="bg-white rounded-md border border-warm-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-[11px]">
             <thead><tr className="bg-warm-50 text-warm-600 text-[10px] uppercase tracking-wider">
@@ -229,7 +332,13 @@ export default function AdminProductsPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </div> */}
+      <DataTable
+        columns={columns}
+        rows={currentProducts}
+        loading={loading}
+        emptyText="No products found"
+      />
       {pagination.totalPages > 1 && <div className="mt-4"><Pagination currentPage={pagination.page} totalPages={pagination.totalPages} onPageChange={(p) => setPagination((prev) => ({ ...prev, page: p }))} /></div>}
     </div>
   );

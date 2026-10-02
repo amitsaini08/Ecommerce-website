@@ -27,7 +27,7 @@ import {
 } from 'recharts';
 import { formatCurrency, formatNumber } from '@/lib/utils';
 import { cn } from '@/lib/cn';
-import PageHeader from '@/components/ui/PageHeader';
+import PageHeader from '@/components/common/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
@@ -48,6 +48,8 @@ const TONES = {
 
 const DEVICE_ICONS = { Mobile: Smartphone, Tablet: Tablet };
 
+import { api } from '@/lib/apiClient/client';
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [analytics, setAnalytics] = useState(null);
@@ -60,22 +62,18 @@ export default function AdminDashboard() {
     if (manual) setRefreshing(true);
 
     try {
-      const [statsRes, analyticsRes] = await Promise.all([
-        fetch('/api/admin/stats', { signal }),
-        fetch('/api/admin/analytics', { signal }),
+      const [statsData, analyticsData] = await Promise.all([
+        api.get('/api/admin/stats', { signal }),
+        api.get('/api/admin/analytics', { signal }),
       ]);
 
-      if (statsRes.ok) setStats(await statsRes.json());
-      if (analyticsRes.ok) setAnalytics(await analyticsRes.json());
+      if (statsData) setStats(statsData);
+      if (analyticsData) setAnalytics(analyticsData);
 
-      if (!statsRes.ok || !analyticsRes.ok) {
-        setError('Some dashboard data could not be loaded.');
-      } else {
-        setError('');
-        setLastUpdated(new Date().toLocaleTimeString('en-IN'));
-      }
+      setError('');
+      setLastUpdated(new Date().toLocaleTimeString('en-IN'));
     } catch (err) {
-      if (err.name === 'AbortError') return;
+      if (err?.name === 'AbortError') return;
       setError('Could not reach the server. Retrying automatically.');
     }
 
@@ -85,7 +83,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const controller = new AbortController();
-    loadData({ signal: controller.signal });
+    queueMicrotask(() => loadData({ signal: controller.signal }));
 
     // tab hidden ho to polling skip
     const id = setInterval(() => {

@@ -3,10 +3,10 @@
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Pencil } from 'lucide-react';
-import ContentSection from '@/components/ui/ContentSection';
+import ContentSection from '@/components/common/ContentSection';
 import Button from '@/components/ui/Button';
 import Spinner from '@/components/ui/Spinner';
-import Lightbox from '@/components/ui/Lightbox';
+import Lightbox from '@/components/common/Lightbox';
 import RatingSummary from './RatingSummary';
 import ReviewCard from './ReviewCard';
 import ReviewForm from './ReviewForm';

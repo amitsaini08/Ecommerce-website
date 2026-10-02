@@ -5,9 +5,10 @@ import { connectToDatabase } from '@/lib/db/models';
 import { checkRateLimit, getClientIP } from '@/lib/rateLimit';
 
 export class AppError extends Error {
-    constructor(message, status = 400) {
+    constructor(message, statusCode = 500, field = null) {
         super(message);
-        this.status = status;
+        this.statusCode = statusCode;
+        this.field = field;
     }
 }
 
@@ -32,15 +33,14 @@ export function routeHandler({ auth = false, roles = null, rateLimit = null, sch
             await connectToDatabase();
 
             let user = null;
-            if (auth || roles) {
-                console.log("Checking authentication for route...");
+            if (auth === 'optional') {
+                user = await getAuthUser(request).catch(() => null);
+            } else if (auth || roles) {
                 user = await getAuthUser(request);
-                console.log("Authenticated user:", user);
                 if (!user) {
                     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
                 }
             }
-
             if (roles) {
                 const allowedRoles = Array.isArray(roles) ? roles : [roles];
                 const userRole = user.role || 'customer';
@@ -71,7 +71,10 @@ export function routeHandler({ auth = false, roles = null, rateLimit = null, sch
             return await handler(request, { ...context, user, data });
         } catch (error) {
             if (error instanceof AppError) {
-                return NextResponse.json({ error: error.message }, { status: error.status });
+                return NextResponse.json(
+                    { error: error.message, ...(error.field && { field: error.field }) },
+                    { status: error.statusCode }
+                );
             }
             console.error('API route error:', error);
             return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });

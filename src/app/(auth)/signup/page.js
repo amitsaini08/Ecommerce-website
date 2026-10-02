@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowRight, Lock, Mail, User } from 'lucide-react';
 import { signupSchema, passwordRules } from '@/lib/validations';
-import AuthCard from '@/components/ui/AuthCard';
+import AuthCard from '@/components/auth/AuthCard';
 import Field from '@/components/ui/Field';
 import Input from '@/components/ui/Input';
 import Alert from '@/components/ui/Alert';

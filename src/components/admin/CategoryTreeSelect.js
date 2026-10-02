@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronDown, ChevronRight, Folder, Search, X, Check, Loader2 } from 'lucide-react';
+import { categoriesApi } from '@/lib/apiClient/categories';
 
 const No_Exclude = new Set();
 export default function CategoryTreeSelect({ value = [], onChange, placeholder = 'Select categories...', excludeIds = No_Exclude }) {
@@ -40,8 +41,7 @@ export default function CategoryTreeSelect({ value = [], onChange, placeholder =
     if (parentKey !== 'root') params.set('parentId', parentKey);
     if (cursor) params.set('cursor', cursor);
     try {
-      const res = await fetch(`/api/admin/categories?${params.toString()}`);
-      const data = await res.json();
+      const data = await categoriesApi.getAdmin(params.toString());
       setChildrenCache((prev) => {
         const existing = prev[parentKey]?.items || [];
         return {
@@ -65,7 +65,7 @@ export default function CategoryTreeSelect({ value = [], onChange, placeholder =
 
   useEffect(() => {
     if (isOpen && !childrenCache.root?.loaded && !childrenCache.root?.loading) {
-      fetchLevel('root');
+      queueMicrotask(() => fetchLevel('root'));
     }
   }, [isOpen, childrenCache.root, fetchLevel]);
 
@@ -76,15 +76,14 @@ export default function CategoryTreeSelect({ value = [], onChange, placeholder =
 
   useEffect(() => {
     if (!search) {
-      setSearchResults(null);
+      queueMicrotask(() => setSearchResults(null));
       return;
     }
     let cancelled = false;
-    setSearchLoading(true);
-    fetch(`/api/admin/categories?q=${encodeURIComponent(search)}`)
-      .then((r) => r.json())
+    queueMicrotask(() => setSearchLoading(true));
+    categoriesApi.getAdmin(`q=${encodeURIComponent(search)}`)
       .then((d) => {
-        if (!cancelled) setSearchResults(d.categories || []);
+        if (!cancelled) setSearchResults(d?.categories || []);
       })
       .finally(() => {
         if (!cancelled) setSearchLoading(false);
@@ -97,12 +96,11 @@ export default function CategoryTreeSelect({ value = [], onChange, placeholder =
   useEffect(() => {
     const missing = value.filter((id) => id && !labelsById[id]);
     if (missing.length === 0) return;
-    fetch(`/api/admin/categories/by-ids?ids=${missing.join(',')}`)
-      .then((r) => r.json())
+    categoriesApi.getByIds(missing)
       .then((d) => {
         setLabelsById((prev) => {
           const next = { ...prev };
-          (d.categories || []).forEach((c) => {
+          (d?.categories || []).forEach((c) => {
             const cid = String(c._id || c.id);
             next[cid] = c.name;
           });

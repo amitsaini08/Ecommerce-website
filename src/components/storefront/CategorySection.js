@@ -1,7 +1,7 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
-import SectionHeader from '@/components/ui/SectionHeader';
-import Section from '@/components/ui/Section';
+import SectionHeader from '@/components/common/SectionHeader';
+import Section from '@/components/common/Section';
 import CategoryImage from '@/components/ui/CategoryImage';
 
 export default function CategorySection({ categories = [] }) {

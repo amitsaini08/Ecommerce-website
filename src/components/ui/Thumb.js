@@ -1,4 +1,4 @@
-import { FiPackage } from 'react-icons/fi';
+import { Package } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 const sizes = {
@@ -18,7 +18,7 @@ export default function Thumb({ src, size = 'sm', className }) {
       {src ? (
         <img src={src} alt="" className="h-full w-full object-cover" />
       ) : (
-        <FiPackage className="h-4 w-4" />
+        <Package className="h-4 w-4" />
       )}
     </div>
   );

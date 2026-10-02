@@ -3,12 +3,16 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import ProductCard from '@/components/ui/ProductCard';
-import Pagination from '@/components/ui/Pagination';
-import Breadcrumbs from '@/components/ui/Breadcrumbs';
+import ProductCard from '@/components/product/ProductCard';
+import Pagination from '@/components/common/Pagination';
+import Section from '@/components/common/Section';
+import Breadcrumbs from '@/components/common/Breadcrumbs';
 import CustomSelect from '@/components/ui/CustomSelect';
-import FilterPanel from '@/components/ui/FilterPanel';
+import FilterPanel from '@/components/storefront/FilterPanel';
+import { formatCurrency } from '@/lib/utils';
 import { Search, Filter, X, SlidersHorizontal, Package } from 'lucide-react';
+import { categoriesApi } from '@/lib/apiClient/categories';
+import { searchApi } from '@/lib/apiClient/search';
 
 const sortOptions = [
   { label: 'Relevance', value: 'newest' },
@@ -51,30 +55,41 @@ function SearchContent() {
   const [minPrice, setMinPrice] = useState(currentMinPrice);
   const [maxPrice, setMaxPrice] = useState(currentMaxPrice);
 
+  async function fetchCategories() {
+    try {
+      const data = await categoriesApi.getAll();
+      setCategories(data?.categories || []);
+    } catch { }
+  }
+
   useEffect(() => {
-    setMinPrice(currentMinPrice);
-    setMaxPrice(currentMaxPrice);
+    queueMicrotask(() => {
+      setMinPrice(currentMinPrice);
+      setMaxPrice(currentMaxPrice);
+    });
   }, [currentMinPrice, currentMaxPrice]);
 
   useEffect(() => {
-    fetchCategories();
+    queueMicrotask(() => fetchCategories());
   }, []);
 
   // Whenever filters/search/sort change, wipe the page-cache (old pages are
   // for a different filter combo, no longer valid)
   useEffect(() => {
     if (lastFilterKey && lastFilterKey !== filterKey) {
-      setPagesCache({});
+      queueMicrotask(() => setPagesCache({}));
     }
-    setLastFilterKey(filterKey);
-  }, [filterKey]);
+    queueMicrotask(() => setLastFilterKey(filterKey));
+  }, [filterKey, lastFilterKey]);
 
   useEffect(() => {
     // Page already cached for this filter combo
     const cached = pagesCache[page];
     if (cached) {
-      setPagination(cached.pagination);
-      setLoading(false);
+      queueMicrotask(() => {
+        setPagination(cached.pagination);
+        setLoading(false);
+      });
       return;
     }
 
@@ -94,14 +109,13 @@ function SearchContent() {
     async function search() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/search?${params.toString()}`);
-        const data = await res.json();
-        if (!res.ok || cancelled) return;
+        const data = await searchApi.search(params.toString());
+        if (cancelled) return;
 
         const entry = {
-          products: data.products || [],
-          pagination: data.pagination || { page: 1, totalPages: 1, total: 0 },
-          categories: data.categories || [],
+          products: data?.products || [],
+          pagination: data?.pagination || { page: 1, totalPages: 1, total: 0 },
+          categories: data?.categories || [],
         };
 
         setPagesCache((prev) => ({ ...prev, [page]: entry }));
@@ -116,14 +130,6 @@ function SearchContent() {
     search();
     return () => { cancelled = true; };
   }, [filterKey, page, pagesCache]);
-
-  async function fetchCategories() {
-    try {
-      const res = await fetch('/api/categories');
-      const data = await res.json();
-      setCategories(data.categories || []);
-    } catch { }
-  }
 
   function updateFilters(updates) {
     const params = new URLSearchParams(searchParams);
@@ -159,7 +165,8 @@ function SearchContent() {
   const matchingCategories = currentEntry?.categories || [];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+    <Section>
+      <div className="space-y-6">
       <Breadcrumbs items={[{ label: 'Search' }]} />
 
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-warm-200/80 pb-5">
@@ -207,9 +214,9 @@ function SearchContent() {
             </span>
           )}
 
-          {(currentMinPrice || currentMaxPrice) && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white border border-warm-200 rounded-md text-xs font-semibold text-warm-800 shadow-2xs">
-              Price: ${currentMinPrice || '0'} – ${currentMaxPrice || '∞'}
+            {(currentMinPrice || currentMaxPrice) && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white border border-warm-200 rounded-md text-xs font-semibold text-warm-800 shadow-2xs">
+                Price: {formatCurrency(currentMinPrice || 0)} – {currentMaxPrice ? formatCurrency(currentMaxPrice) : '∞'}
               <button
                 onClick={() => {
                   setMinPrice('');
@@ -379,6 +386,7 @@ function SearchContent() {
         </div>
       )}
     </div>
+    </Section>
   );
 }
 

@@ -13,6 +13,7 @@ export default function DataTable({
   loading = false,
   emptyText = 'Nothing to show yet.',
   rowClassName,
+  onRowClick
 }) {
   const span = columns.length;
 
@@ -20,7 +21,7 @@ export default function DataTable({
     <div className="overflow-x-auto rounded-xl border border-warm-200 bg-white shadow-sm">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-warm-200 bg-warm-50 text-xs font-semibold uppercase tracking-wider text-warm-600">
+          <tr className="border-b border-warm-200 bg-warm-50 text-[12px] font-semibold uppercase tracking-wider text-warm-600">
             {columns.map((col) => (
               <th
                 key={col.key}
@@ -52,12 +53,13 @@ export default function DataTable({
             rows.map((row) => (
               <tr
                 key={rowKey(row)}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
                 className={cn('transition-colors hover:bg-warm-50/60', rowClassName?.(row))}
               >
                 {columns.map((col) => (
                   <td
                     key={col.key}
-                    className={cn('px-4 py-3 align-middle', ALIGN[col.align || 'left'], col.className)}
+                    className={cn('px-4 py-3 text-[13px] align-middle', ALIGN[col.align || 'left'], col.className)}
                   >
                     {col.render(row)}
                   </td>

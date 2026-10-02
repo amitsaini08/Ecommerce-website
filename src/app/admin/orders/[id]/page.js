@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useToast } from '@/components/ui/Toast';
+import { useToast } from '@/components/common/Toast';
 import { Package, Phone } from 'lucide-react';
 import { FiArrowLeft, FiSend, FiCheck, FiX, FiRefreshCw } from 'react-icons/fi';
 import { formatCurrency } from '@/lib/utils';
-import { invalidateOrder } from '../page';
+import { invalidateOrder } from '@/lib/orderCache';
 
 const statusOptions = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
 const paymentStatusOptions = ['pending', 'paid', 'failed', 'refunded'];
@@ -27,6 +27,9 @@ const paymentStatusColors = {
   refunded: 'bg-purple-50 text-purple-700 border-purple-200',
 };
 
+import { ordersApi } from '@/lib/apiClient/orders';
+import { useMutation } from '@/hooks/useMutation';
+
 export default function AdminOrderDetailPage() {
   const { id } = useParams();
   const toast = useToast();
@@ -40,7 +43,14 @@ export default function AdminOrderDetailPage() {
   const [newStatus, setNewStatus] = useState('');
   const [newPaymentStatus, setNewPaymentStatus] = useState('');
   const [actionReason, setActionReason] = useState('');
-  const [updating, setUpdating] = useState(false);
+
+  const actionMutation = useMutation(({ actionType, extraData }) =>
+    ordersApi.adminAction(id, {
+      action: actionType,
+      reason: actionReason,
+      ...extraData,
+    })
+  );
 
   useEffect(() => {
     fetchOrder();
@@ -48,9 +58,8 @@ export default function AdminOrderDetailPage() {
 
   async function fetchOrder() {
     try {
-      const res = await fetch(`/api/admin/orders/${id}`);
-      const data = await res.json();
-      if (res.ok) {
+      const data = await ordersApi.getAdminById(id);
+      if (data?.order) {
         setOrder(data.order);
         setItems(data.items || []);
         setHistory(data.history || []);
@@ -66,30 +75,13 @@ export default function AdminOrderDetailPage() {
   }
 
   async function handleAdminAction(actionType, extraData = {}) {
-    setUpdating(true);
-    try {
-      const res = await fetch(`/api/admin/orders/${id}/action`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: actionType,
-          reason: actionReason,
-          ...extraData,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success(data.message || 'Action executed successfully');
-        setActionReason('');
-        invalidateOrder(id);
-        fetchOrder();
-      } else {
-        toast.error(data.error || 'Failed to execute action');
-      }
-    } catch {
-      toast.error('Network error');
+    const data = await actionMutation.run({ actionType, extraData });
+    if (data) {
+      toast.success(data.message || 'Action executed successfully');
+      setActionReason('');
+      invalidateOrder(id);
+      fetchOrder();
     }
-    setUpdating(false);
   }
 
   if (loading) {
@@ -176,14 +168,14 @@ export default function AdminOrderDetailPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => handleAdminAction('approve_return')}
-                  disabled={updating}
+                  disabled={actionMutation.loading}
                   className="flex items-center gap-1.5 px-3.5 py-2 bg-green-600 text-white text-[11px] font-bold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 shadow-sm"
                 >
                   <FiCheck className="w-3.5 h-3.5" /> Approve Return & Refund Stock
                 </button>
                 <button
                   onClick={() => handleAdminAction('reject_return')}
-                  disabled={updating}
+                  disabled={actionMutation.loading}
                   className="flex items-center gap-1.5 px-3.5 py-2 bg-red-600 text-white text-[11px] font-bold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 shadow-sm"
                 >
                   <FiX className="w-3.5 h-3.5" /> Reject Return
@@ -382,7 +374,7 @@ export default function AdminOrderDetailPage() {
                     onClick={() =>
                       handleAdminAction('update_status', { status: newStatus })
                     }
-                    disabled={updating}
+                    disabled={actionMutation.loading}
                     className="px-3.5 py-2 bg-brand-500 text-white text-[10px] font-bold rounded-lg hover:bg-brand-600 disabled:opacity-50 transition-colors shadow-sm whitespace-nowrap"
                   >
                     Save
@@ -412,7 +404,7 @@ export default function AdminOrderDetailPage() {
                         paymentStatus: newPaymentStatus,
                       })
                     }
-                    disabled={updating}
+                    disabled={actionMutation.loading}
                     className="px-3.5 py-2 bg-warm-900 text-white text-[10px] font-bold rounded-lg hover:bg-warm-800 disabled:opacity-50 transition-colors shadow-sm whitespace-nowrap"
                   >
                     Save

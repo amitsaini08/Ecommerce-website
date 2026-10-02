@@ -1,5 +1,5 @@
-import Link from 'next/link';
-import Section from '@/components/ui/Section';
+﻿import Link from 'next/link';
+import Section from '@/components/common/Section';
 import CategoryImage from '@/components/ui/CategoryImage';
 
 export default function CategoryQuickNav({ categories = [] }) {
@@ -7,7 +7,7 @@ export default function CategoryQuickNav({ categories = [] }) {
 
   return (
     <Section padding="sm" className="border-b border-warm-100">
-      <div className="no-scrollbar flex items-center gap-5 overflow-x-auto sm:gap-7">
+      <div className="no-scrollbar flex items-center py-3 gap-5 overflow-x-auto sm:gap-7">
         {categories.map((cat) => (
           <Link
             key={cat._id || cat.id}

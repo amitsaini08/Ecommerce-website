@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useSelector } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { selectUser, selectAuthLoading } from '@/lib/store/authSlice';
-import Breadcrumbs from '@/components/ui/Breadcrumbs';
+import Breadcrumbs from '@/components/common/Breadcrumbs';
 import { formatCurrency } from '@/lib/utils';
 import { FiPackage, FiChevronRight } from 'react-icons/fi';
 
@@ -17,6 +17,8 @@ const statusColors = {
   cancelled: 'bg-rose-100 text-rose-800',
 };
 
+import { ordersApi } from '@/lib/apiClient/orders';
+
 export default function OrdersPage() {
   const user = useSelector(selectUser);
   const authLoading = useSelector(selectAuthLoading);
@@ -24,20 +26,19 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) { router.push('/login'); return; }
-    fetchOrders();
-  }, [user, authLoading]);
-
   async function fetchOrders() {
     try {
-      const res = await fetch('/api/orders');
-      const data = await res.json();
-      if (res.ok) setOrders(data.orders || []);
+      const data = await ordersApi.getUserOrders();
+      setOrders(data?.orders || []);
     } catch {}
     setLoading(false);
   }
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) { router.push('/login'); return; }
+    queueMicrotask(() => fetchOrders());
+  }, [user, authLoading]);
 
   if (loading || authLoading) {
     return (

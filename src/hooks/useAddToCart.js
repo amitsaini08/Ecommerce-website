@@ -2,7 +2,7 @@
 
 import { useDispatch, useSelector } from 'react-redux';
 import { addItem, selectCartItems } from '@/lib/store/cartSlice';
-import { useToast } from '@/components/ui/Toast';
+import { useToast } from '@/components/common/Toast';
 
 export default function useAddToCart() {
   const dispatch = useDispatch();

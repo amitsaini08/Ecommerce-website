@@ -22,7 +22,7 @@ const Input = forwardRef(function Input(
         type={isPassword && show ? 'text' : type}
         aria-invalid={!!error}
         className={cn(
-          'h-10 w-full rounded-md border bg-white text-sm text-warm-900 transition-colors',
+          'h-10 w-full rounded-md border bg-white text-xs text-warm-900 transition-colors',
           'placeholder:text-warm-400 focus:outline-none focus:ring-2',
           Icon ? 'pl-10' : 'pl-3.5',
           isPassword ? 'pr-11' : 'pr-3.5',

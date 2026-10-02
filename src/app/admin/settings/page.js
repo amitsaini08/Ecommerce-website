@@ -1,219 +1,229 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useToast } from '@/components/ui/Toast';
-import { Settings, Save, Check } from 'lucide-react';
+import { useToast } from '@/components/common/Toast';
+import { Settings, Check, Mail, Phone } from 'lucide-react';
+import Field from '@/components/ui/Field';
+import Input from '@/components/ui/Input';
+import Button from '@/components/ui/Button';
+
+import { settingsApi } from '@/lib/apiClient/settings';
+import { useMutation } from '@/hooks/useMutation';
+
+const COMPACT = 'h-8 text-[11px]';
+
+const DEFAULTS = {
+  storeName: 'NovaHub',
+  contactEmail: '',
+  contactPhone: '',
+  codEnabled: true,
+  shippingFee: '0',
+  minFreeShipping: '50',
+};
+
+function validate(form) {
+  const errors = {};
+  if (!form.storeName.trim()) errors.storeName = 'Store name is required';
+  if (form.contactEmail && !/^\S+@\S+\.\S+$/.test(form.contactEmail)) {
+    errors.contactEmail = 'Enter a valid email address';
+  }
+  if (form.shippingFee === '' || Number(form.shippingFee) < 0) {
+    errors.shippingFee = 'Shipping fee cannot be negative';
+  }
+  if (form.minFreeShipping === '' || Number(form.minFreeShipping) < 0) {
+    errors.minFreeShipping = 'Minimum order cannot be negative';
+  }
+  return errors;
+}
 
 export default function AdminSettingsPage() {
   const toast = useToast();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(DEFAULTS);
+  const [errors, setErrors] = useState({});
 
-  const [form, setForm] = useState({
-    storeName: 'NovaHub',
-    contactEmail: '',
-    contactPhone: '',
-    codEnabled: true,
-    shippingFee: '0',
-    minFreeShipping: '50',
-  });
+  const saveMutation = useMutation((payload) => settingsApi.update(payload));
 
-  useEffect(() => {
-    fetchSettings();
-  }, []);
+  // one handler for every field
+  const set = (field) => (e) => {
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setForm((f) => ({ ...f, [field]: value }));
+    setErrors((er) => ({ ...er, [field]: undefined }));
+  };
 
   async function fetchSettings() {
     try {
-      const res = await fetch('/api/admin/settings');
-      const data = await res.json();
-      if (res.ok && data.settings) {
+      const data = await settingsApi.get();
+      if (data?.settings) {
+        const s = data.settings;
         setForm({
-          storeName: data.settings.storeName || 'NovaHub',
-          contactEmail: data.settings.contactEmail || '',
-          contactPhone: data.settings.contactPhone || '',
-          codEnabled: data.settings.codEnabled ?? true,
-          shippingFee: data.settings.shippingFee || '0',
-          minFreeShipping: data.settings.minFreeShipping || '50',
+          storeName: s.storeName || DEFAULTS.storeName,
+          contactEmail: s.contactEmail || '',
+          contactPhone: s.contactPhone || '',
+          codEnabled: s.codEnabled ?? true,
+          shippingFee: String(s.shippingFee ?? '0'),
+          minFreeShipping: String(s.minFreeShipping ?? '50'),
         });
       }
-    } catch {}
+    } catch {
+      toast.error('Failed to load settings');
+    }
     setLoading(false);
   }
 
+  useEffect(() => {
+    queueMicrotask(() => fetchSettings());
+  }, []);
+
   async function handleSubmit(e) {
     e.preventDefault();
-    setSaving(true);
-    try {
-      const res = await fetch('/api/admin/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          shippingFee: parseFloat(form.shippingFee) || 0,
-          minFreeShipping: parseFloat(form.minFreeShipping) || 0,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success('Store settings saved successfully!');
-      } else {
-        toast.error(data.error || 'Failed to save settings');
-      }
-    } catch {
-      toast.error('Network error');
+
+    const errs = validate(form);
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      return;
     }
-    setSaving(false);
+
+    const res = await saveMutation.run({
+      ...form,
+      storeName: form.storeName.trim(),
+      shippingFee: parseFloat(form.shippingFee) || 0,
+      minFreeShipping: parseFloat(form.minFreeShipping) || 0,
+    });
+    if (res) toast.success('Store settings saved successfully!');
   }
 
   if (loading) {
     return (
-      <div className="max-w-2xl mx-auto p-6 text-center">
-        <div className="w-5 h-5 border-2 border-brand-600/30 border-t-brand-600 rounded-full animate-spin mx-auto mb-2" />
+      <div className="mx-auto max-w-2xl p-6 text-center">
+        <div className="mx-auto mb-2 h-5 w-5 animate-spin rounded-full border-2 border-brand-600/30 border-t-brand-600" />
         <p className="text-[11px] text-warm-500">Loading store settings...</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
+    <div className="mx-auto max-w-2xl space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-base font-bold text-warm-900">Store Settings</h1>
-          <p className="text-[11px] text-warm-500">Configure global storefront preferences & checkout defaults</p>
+          <p className="text-[11px] text-warm-500">
+            Configure global storefront preferences & checkout defaults
+          </p>
         </div>
-
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={saving}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-warm-900 text-white text-[11px] font-semibold rounded-md hover:bg-warm-800 transition-all shadow-xs disabled:opacity-60"
-        >
-          {saving ? (
-            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : (
-            <Save className="w-3.5 h-3.5" />
-          )}
-          <span>{saving ? 'Saving...' : 'Save Settings'}</span>
-        </button>
+        <Button type="submit" form="settings-form" size="sm" variant="dark" className="text-[12px]" loading={saveMutation.loading}>
+          {!saveMutation.loading && <Check className="h-4 w-4" />}
+          Save Settings
+        </Button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Section 1: General & Contact */}
-        <div className="bg-white border border-warm-200 rounded-md p-4 space-y-3 shadow-xs">
-          <h2 className="text-[13px] font-bold text-warm-900 border-b border-warm-100 pb-2 flex items-center gap-1.5">
-            <Settings className="w-3.5 h-3.5 text-brand-600" />
+      <form id="settings-form" onSubmit={handleSubmit} noValidate className="space-y-4">
+        {/* General & Contact */}
+        <div className="space-y-3 rounded-md border border-warm-200 bg-white p-4 shadow-xs">
+          <h2 className="flex items-center gap-1.5 border-b border-warm-100 pb-2 text-[13px] font-bold text-warm-900">
+            <Settings className="h-3.5 w-3.5 text-brand-600" />
             General & Contact Information
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[10px] font-semibold text-warm-700 mb-1">
-                Store Name *
-              </label>
-              <input
-                type="text"
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Store Name" htmlFor="storeName" required error={errors.storeName}>
+              <Input
+                id="storeName"
+                className={COMPACT}
                 value={form.storeName}
-                onChange={(e) => setForm({ ...form, storeName: e.target.value })}
-                className="w-full px-2.5 py-1.5 bg-white border border-warm-200 rounded-md text-[11px] text-warm-900 focus:outline-none focus:border-brand-600"
-                required
+                onChange={set('storeName')}
+                error={errors.storeName}
               />
-            </div>
+            </Field>
 
-            <div>
-              <label className="block text-[10px] font-semibold text-warm-700 mb-1">
-                Customer Support Email
-              </label>
-              <input
+            <Field label="Customer Support Email" htmlFor="contactEmail" error={errors.contactEmail}>
+              <Input
+                id="contactEmail"
                 type="email"
-                value={form.contactEmail}
-                onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
+                icon={Mail}
+                className={COMPACT}
                 placeholder="support@novahub.com"
-                className="w-full px-2.5 py-1.5 bg-white border border-warm-200 rounded-md text-[11px] text-warm-900 focus:outline-none focus:border-brand-600"
+                value={form.contactEmail}
+                onChange={set('contactEmail')}
+                error={errors.contactEmail}
               />
-            </div>
+            </Field>
 
             <div className="sm:col-span-2">
-              <label className="block text-[10px] font-semibold text-warm-700 mb-1">
-                Customer Support Phone
-              </label>
-              <input
-                type="tel"
-                value={form.contactPhone}
-                onChange={(e) => setForm({ ...form, contactPhone: e.target.value })}
-                placeholder="+1 (555) 000-0000"
-                className="w-full px-2.5 py-1.5 bg-white border border-warm-200 rounded-md text-[11px] text-warm-900 focus:outline-none focus:border-brand-600"
-              />
+              <Field label="Customer Support Phone" htmlFor="contactPhone">
+                <Input
+                  id="contactPhone"
+                  type="tel"
+                  icon={Phone}
+                  className={COMPACT}
+                  placeholder="+91 98765 43210"
+                  value={form.contactPhone}
+                  onChange={set('contactPhone')}
+                />
+              </Field>
             </div>
           </div>
         </div>
 
-        {/* Section 2: Payments & Shipping */}
-        <div className="bg-white border border-warm-200 rounded-md p-4 space-y-3 shadow-xs">
-          <h2 className="text-[13px] font-bold text-warm-900 border-b border-warm-100 pb-2">
+        {/* Payment & Shipping */}
+        <div className="space-y-3 rounded-md border border-warm-200 bg-white p-4 shadow-xs">
+          <h2 className="border-b border-warm-100 pb-2 text-[13px] font-bold text-warm-900">
             Payment & Shipping Rules
           </h2>
 
-          <div className="space-y-3">
-            <label className="flex items-center gap-2.5 p-2.5 border border-warm-200 rounded-md cursor-pointer hover:bg-warm-50/50 transition-colors">
-              <input
-                type="checkbox"
-                checked={form.codEnabled}
-                onChange={(e) => setForm({ ...form, codEnabled: e.target.checked })}
-                className="w-3.5 h-3.5 accent-warm-900 rounded"
-              />
-              <div>
-                <p className="text-[11px] font-bold text-warm-900">Enable Cash on Delivery (COD)</p>
-                <p className="text-[10px] text-warm-500">
-                  Allow shoppers to pay in cash upon package arrival
-                </p>
-              </div>
-            </label>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-0.5">
-              <div>
-                <label className="block text-[10px] font-semibold text-warm-700 mb-1">
-                  Flat Rate Shipping Fee ($)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={form.shippingFee}
-                  onChange={(e) => setForm({ ...form, shippingFee: e.target.value })}
-                  className="w-full px-2.5 py-1.5 bg-white border border-warm-200 rounded-md text-[11px] text-warm-900 focus:outline-none focus:border-brand-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-semibold text-warm-700 mb-1">
-                  Minimum Order for Free Shipping ($)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={form.minFreeShipping}
-                  onChange={(e) => setForm({ ...form, minFreeShipping: e.target.value })}
-                  className="w-full px-2.5 py-1.5 bg-white border border-warm-200 rounded-md text-[11px] text-warm-900 focus:outline-none focus:border-brand-600"
-                />
-              </div>
+          <label className="flex cursor-pointer items-center gap-2.5 rounded-md border border-warm-200 p-2.5 transition-colors hover:bg-warm-50/50">
+            <input
+              type="checkbox"
+              checked={form.codEnabled}
+              onChange={set('codEnabled')}
+              className="h-3.5 w-3.5 rounded accent-warm-900"
+            />
+            <div>
+              <p className="text-[11px] font-bold text-warm-900">Enable Cash on Delivery (COD)</p>
+              <p className="text-[10px] text-warm-500">Allow shoppers to pay in cash upon package arrival</p>
             </div>
+          </label>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Flat Rate Shipping Fee (₹)" htmlFor="shippingFee" error={errors.shippingFee}>
+              <Input
+                id="shippingFee"
+                type="number"
+                step="0.01"
+                min={0}
+                className={COMPACT}
+                value={form.shippingFee}
+                onChange={set('shippingFee')}
+                error={errors.shippingFee}
+              />
+            </Field>
+
+            <Field
+              label="Minimum Order for Free Shipping (₹)"
+              htmlFor="minFreeShipping"
+              error={errors.minFreeShipping}
+            >
+              <Input
+                id="minFreeShipping"
+                type="number"
+                step="0.01"
+                min={0}
+                className={COMPACT}
+                value={form.minFreeShipping}
+                onChange={set('minFreeShipping')}
+                error={errors.minFreeShipping}
+              />
+            </Field>
           </div>
         </div>
 
-        {/* Save button footer */}
+        {/* Footer */}
         <div className="flex justify-end pt-1.5">
-          <button
-            type="submit"
-            disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-2 bg-warm-900 text-white text-[11px] font-semibold rounded-md hover:bg-warm-800 transition-all shadow-xs disabled:opacity-60"
-          >
-            {saving ? (
-              <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <Check className="w-3.5 h-3.5" />
-            )}
-            <span>{saving ? 'Saving Settings...' : 'Save Settings'}</span>
-          </button>
+          <Button type="submit" size="sm" variant="dark" className="text-[12px]" loading={saveMutation.loading}>
+            {!saveMutation.loading && <Check className="h-4 w-4" />}
+            Save Settings
+          </Button>
         </div>
       </form>
     </div>

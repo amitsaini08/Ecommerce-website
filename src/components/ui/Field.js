@@ -2,7 +2,7 @@ export default function Field({ label, htmlFor, required, error, aside, children
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <label htmlFor={htmlFor} className="block text-sm font-medium text-warm-700">
+        <label htmlFor={htmlFor} className="block text-xs font-medium text-warm-700">
           {label}
           {required && <span className="text-red-500"> *</span>}
         </label>

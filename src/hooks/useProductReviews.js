@@ -3,8 +3,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUser } from '@/lib/store/authSlice';
-import { useToast } from '@/components/ui/Toast';
+import { useToast } from '@/components/common/Toast';
 import { getSocket } from '@/lib/socket';
+
+import { reviewsApi } from '@/lib/apiClient/reviews';
 
 const PAGE_SIZE = 5;
 const EMPTY_SUMMARY = { avg: 0, count: 0, distribution: {} };
@@ -29,15 +31,11 @@ export function useProductReviews(slug, productId) {
 
   const fetchPage = useCallback(
     async (page = 1, signal) => {
-      if (page === 1) setLoading(true);
-      else setLoadingMore(true);
+      if (page === 1) setLoading(true)
+      else setLoadingMore(true)
 
       try {
-        const res = await fetch(`/api/products/${slug}/reviews?page=${page}&limit=${PAGE_SIZE}`, {
-          signal,
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error('Failed to load reviews');
+        const data = await reviewsApi.getProductReviews(slug, page, PAGE_SIZE, { signal });
 
         if (page === 1) {
           setMyReviews(data.myReviews || []);
@@ -60,14 +58,14 @@ export function useProductReviews(slug, productId) {
     [slug]
   );
 
-  // slug ya login badalne par page 1 dobara
+
   useEffect(() => {
     const controller = new AbortController();
-    fetchPage(1, controller.signal);
+    queueMicrotask(() => fetchPage(1, controller.signal));
     return () => controller.abort();
   }, [fetchPage, userId]);
 
-  // realtime updates
+
   useEffect(() => {
     if (!productId) return;
     const socket = getSocket();
@@ -143,16 +141,7 @@ export function useProductReviews(slug, productId) {
           }
         : form;
 
-      const res = await fetch(
-        editId ? `/api/products/${slug}/reviews/${editId}` : `/api/products/${slug}/reviews`,
-        {
-          method: editId ? 'PUT' : 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-socket-id': getSocket().id ?? '' },
-          body: JSON.stringify(body),
-        }
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to save review');
+      const data = await reviewsApi.saveProductReview(slug, editId, body);
 
       setMyReviews((prev) => prev.map((r) => (r._id === (editId || tempId) ? data.review : r)));
       setSummary(data.summary);
@@ -170,12 +159,7 @@ export function useProductReviews(slug, productId) {
     setMyReviews((prev) => prev.filter((r) => r._id !== review._id));
 
     try {
-      const res = await fetch(`/api/products/${slug}/reviews/${review._id}`, {
-        method: 'DELETE',
-        headers: { 'x-socket-id': getSocket().id ?? '' },
-      });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
+      const data = await reviewsApi.removeProductReview(slug, review._id);
       setSummary(data.summary);
       toast.success('Review deleted');
     } catch {

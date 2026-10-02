@@ -4,19 +4,21 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { SlidersHorizontal, Package } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import Section from '@/components/ui/Section';
-import PageHeader from '@/components/ui/PageHeader';
+import Section from '@/components/common/Section';
+import PageHeader from '@/components/common/PageHeader';
 import Button from '@/components/ui/Button';
 import Chip from '@/components/ui/Chip';
-import Drawer from '@/components/ui/Drawer';
-import EmptyState from '@/components/ui/EmptyState';
-import ProductGrid from '@/components/ui/ProductGrid';
-import ProductCard from '@/components/ui/ProductCard';
-import Pagination from '@/components/ui/Pagination';
-import Breadcrumbs from '@/components/ui/Breadcrumbs';
+import Drawer from '@/components/common/Drawer';
+import EmptyState from '@/components/common/EmptyState';
+import ProductGrid from '@/components/product/ProductGrid';
+import ProductCard from '@/components/product/ProductCard';
+import Pagination from '@/components/common/Pagination';
+import Breadcrumbs from '@/components/common/Breadcrumbs';
 import CustomSelect from '@/components/ui/CustomSelect';
-import FilterPanel from '@/components/ui/FilterPanel';
-import ActiveFilters from '@/components/ui/ActiveFilters';
+import FilterPanel from '@/components/storefront/FilterPanel';
+import ActiveFilters from '@/components/common/ActiveFilters';
+import { categoriesApi } from '@/lib/apiClient/categories';
+import { productsApi } from '@/lib/apiClient/products';
 
 const PAGE_SIZE = 12;
 
@@ -58,16 +60,17 @@ function ProductsContent() {
   const [maxPrice, setMaxPrice] = useState(currentMaxPrice);
 
   useEffect(() => {
-    setMinPrice(currentMinPrice);
-    setMaxPrice(currentMaxPrice);
+    queueMicrotask(() => {
+      setMinPrice(currentMinPrice);
+      setMaxPrice(currentMaxPrice);
+    });
   }, [currentMinPrice, currentMaxPrice]);
 
   useEffect(() => {
     async function loadCategories() {
       try {
-        const res = await fetch('/api/categories');
-        const json = await res.json();
-        setCategories(json.categories || []);
+        const json = await categoriesApi.getAll();
+        setCategories(json?.categories || []);
       } catch {
         setCategories([]);
       }
@@ -93,13 +96,11 @@ function ProductsContent() {
         if (!params.get('page')) params.set('page', '1');
         if (!params.get('sort')) params.set('sort', 'newest');
 
-        const res = await fetch(`/api/products?${params}`, { signal: controller.signal });
-        if (!res.ok) throw new Error('Failed to load products');
-        const json = await res.json();
+        const json = await productsApi.getAll(params.toString(), { signal: controller.signal });
 
         const next = {
-          products: json.products || [],
-          pagination: json.pagination || EMPTY_DATA.pagination,
+          products: json?.products || [],
+          pagination: json?.pagination || EMPTY_DATA.pagination,
         };
         cacheRef.current.set(requestKey, next);
         setData(next);

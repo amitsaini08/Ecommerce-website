@@ -1,6 +1,6 @@
 import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import Button from './Button';
+import Button from '@/components/ui/Button';
 
 const tones = {
     brand: {

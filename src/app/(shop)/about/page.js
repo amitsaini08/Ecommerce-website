@@ -1,4 +1,4 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import {
   ArrowRight,
   ShieldCheck,
@@ -6,8 +6,8 @@ import {
   Truck,
 } from 'lucide-react';
 
-import Breadcrumbs from '@/components/ui/Breadcrumbs';
-import Section from '@/components/ui/Section';
+import Breadcrumbs from '@/components/common/Breadcrumbs';
+import Section from '@/components/common/Section';
 
 export const metadata = {
   title: 'About Us — NovaHub',

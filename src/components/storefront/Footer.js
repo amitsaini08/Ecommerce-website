@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { FiInstagram, FiTwitter, FiFacebook, FiYoutube } from 'react-icons/fi';
+import { FaFacebook, FaTwitter, FaInstagram, FaYoutube } from "react-icons/fa"; 
 
 const footerLinks = {
   Shop: [
@@ -26,10 +26,10 @@ const footerLinks = {
 };
 
 const socialLinks = [
-  { Icon: FiInstagram, href: '#', label: 'Instagram' },
-  { Icon: FiTwitter, href: '#', label: 'Twitter' },
-  { Icon: FiFacebook, href: '#', label: 'Facebook' },
-  { Icon: FiYoutube, href: '#', label: 'YouTube' },
+  { Icon: FaInstagram, href: '#', label: 'Instagram' },
+  { Icon: FaTwitter, href: '#', label: 'Twitter' },
+  { Icon: FaFacebook, href: '#', label: 'Facebook' },
+  { Icon: FaYoutube, href: '#', label: 'YouTube' },
 ];
 
 export default function Footer() {

@@ -1,4 +1,4 @@
-import Button from './Button';
+import Button from '@/components/ui/Button';
 
 export default function ActiveFilters({ onClear, children }) {
   return (

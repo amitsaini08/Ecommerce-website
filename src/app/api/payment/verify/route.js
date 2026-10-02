@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
-import { Order } from '@/lib/db/models';
-import { routeHandler, AppError } from '@/app/api/routeHandler';
+import { routeHandler } from '@/app/api/routeHandler';
 import { z } from 'zod';
+import { paymentService } from '@/lib/services/paymentService';
 
 const verifyPaymentSchema = z.object({
   razorpay_order_id: z.string().min(1),
@@ -16,35 +15,7 @@ export const POST = routeHandler({
   rateLimit: { key: 'verify-payment', max: 3, windowSec: 10 * 60 },
   schema: verifyPaymentSchema,
   handler: async (request, { data }) => {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId } = data;
-
-    const expectedSignature = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-      .digest('hex');
-
-    if (expectedSignature !== razorpay_signature) {
-      throw new AppError('Invalid payment signature', 400);
-    }
-
-    const order = await Order.findById(orderId);
-    if (!order) throw new AppError('Order not found', 404);
-
-    order.status = 'confirmed';
-    order.paymentStatus = 'paid';
-    order.razorpayPaymentId = razorpay_payment_id;
-
-    order.statusHistory.push({
-      status: 'confirmed',
-      note: `Payment verified via client signature. Payment ID: ${razorpay_payment_id}`,
-      changedAt: new Date(),
-    });
-
-    await order.save();
-
-    return NextResponse.json({
-      orderId: String(order._id),
-      message: 'Payment verified successfully! Order confirmed.',
-    });
+    const result = await paymentService.verifyPayment(data);
+    return NextResponse.json(result);
   },
 });

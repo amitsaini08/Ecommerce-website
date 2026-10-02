@@ -9,13 +9,14 @@ import { addToWishlist, removeFromWishlist, selectIsWishlisted } from '@/lib/sto
 import { selectUser } from '@/lib/store/authSlice';
 import { formatCurrency, getEffectivePrice, getDiscountPercent } from '@/lib/utils';
 import { cn } from '@/lib/cn';
-import { useToast } from '@/components/ui/Toast';
+import { useToast } from '@/components/common/Toast';
 import StarRating from '@/components/ui/StarRating';
-import QuickViewModal from '@/components/ui/QuickViewModal';
+import QuickViewModal from '@/components/product/QuickViewModal';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import IconButton from '@/components/ui/IconButton';
 import useAddToCart from '@/hooks/useAddToCart';
+import { wishlistApi } from '@/lib/apiClient/wishlist';
 
 const NEW_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -39,7 +40,8 @@ export default function ProductCard({ product, variant = 'default' }) {
   const effectivePrice = getEffectivePrice(product);
   const hasDiscount = effectivePrice < Number(price);
   const discountPercent = getDiscountPercent(product);
-  const isNew = !!createdAt && Date.now() - new Date(createdAt).getTime() < NEW_WINDOW_MS;
+  const createdTime = createdAt ? new Date(createdAt).getTime() : 0;
+  const isNew = createdTime > 0 && typeof window !== 'undefined' && (new Date().getTime() - createdTime < NEW_WINDOW_MS);
   const outOfStock = typeof stock === 'number' && stock <= 0;
 
   const handleAddToCart = () => addProductToCart(product, 1);
@@ -50,7 +52,7 @@ export default function ProductCard({ product, variant = 'default' }) {
       toast.info(`Removed ${name} from wishlist`);
       if (user) {
         try {
-          await fetch(`/api/wishlist/${productId}`, { method: 'DELETE' });
+          await wishlistApi.remove(productId);
         } catch { }
       }
       return;
@@ -60,11 +62,7 @@ export default function ProductCard({ product, variant = 'default' }) {
     toast.success(`Added ${name} to wishlist!`);
     if (user) {
       try {
-        await fetch('/api/wishlist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productId }),
-        });
+        await wishlistApi.add(productId);
       } catch { }
     }
   };

@@ -5,9 +5,9 @@ export default function Pagination({
   totalPages,
   onPageChange,
 }) {
-  if (totalPages <= 1) return null;
-
   const [pageInput, setPageInput] = useState('');
+
+  if (totalPages <= 1) return null;
 
   const pages = [];
   const maxVisible = 5;

@@ -3,10 +3,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FiSearch, FiX, FiGrid, FiPackage } from 'react-icons/fi';
+import { Search, X, Grid, Package } from 'lucide-react';
 import { debounce } from '@/lib/debounce';
 import { formatCurrency } from '@/lib/utils';
 import Thumb from '@/components/ui/Thumb';
+
+import { searchApi } from '@/lib/apiClient/search';
 
 function GroupLabel({ icon: Icon, children }) {
   return (
@@ -29,9 +31,8 @@ export default function SearchOverlay({ onClose }) {
       debounce(async (searchQuery) => {
         setLoading(true);
         try {
-          const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}&limit=6`);
-          const data = await res.json();
-          setResults({ categories: data.categories || [], products: data.products || [] });
+          const data = await searchApi.search(`q=${encodeURIComponent(searchQuery)}&limit=6`);
+          setResults({ categories: data?.categories || [], products: data?.products || [] });
         } catch {
           setResults({ categories: [], products: [] });
         } finally {
@@ -57,8 +58,10 @@ export default function SearchOverlay({ onClose }) {
   useEffect(() => {
     const trimmed = query.trim();
     if (!trimmed) {
-      setResults({ categories: [], products: [] });
-      setLoading(false);
+      queueMicrotask(() => {
+        setResults({ categories: [], products: [] });
+        setLoading(false);
+      });
       return;
     }
     searchProducts(trimmed);
@@ -83,7 +86,7 @@ export default function SearchOverlay({ onClose }) {
       >
         <div className="overflow-hidden rounded-xl bg-white shadow-2xl">
           <form onSubmit={handleSubmit} className="flex items-center border-b border-warm-100 px-4 py-3">
-            <FiSearch className="h-5 w-5 shrink-0 text-warm-400" />
+            <Search className="h-5 w-5 shrink-0 text-warm-400" />
             <input
               ref={inputRef}
               type="text"
@@ -98,7 +101,7 @@ export default function SearchOverlay({ onClose }) {
               aria-label="Close search"
               className="rounded-full p-1.5 text-warm-400 hover:bg-warm-50 hover:text-warm-600"
             >
-              <FiX className="h-5 w-5" />
+              <X className="h-5 w-5" />
             </button>
           </form>
 
@@ -110,7 +113,7 @@ export default function SearchOverlay({ onClose }) {
                 <>
                   {results.categories.length > 0 && (
                     <div className="py-2">
-                      <GroupLabel icon={FiGrid}>Categories</GroupLabel>
+                      <GroupLabel icon={Grid}>Categories</GroupLabel>
                       {results.categories.slice(0, 5).map((cat) => (
                         <Link
                           key={cat._id || cat.id}
@@ -127,7 +130,7 @@ export default function SearchOverlay({ onClose }) {
 
                   {results.products.length > 0 && (
                     <div className="py-2">
-                      <GroupLabel icon={FiPackage}>Products</GroupLabel>
+                      <GroupLabel icon={Package}>Products</GroupLabel>
                       {results.products.map((product) => (
                         <Link
                           key={product._id || product.id}

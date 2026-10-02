@@ -1,4 +1,4 @@
-import Logo from '@/components/ui/Logo';
+import Logo from '@/components/common/Logo';
 
 export const metadata = {
   title: 'NovaHub — Account',

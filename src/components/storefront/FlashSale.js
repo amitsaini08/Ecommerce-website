@@ -1,7 +1,7 @@
 import { Tag, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import Section from '@/components/ui/Section';
-import PromoCard from '@/components/ui/PromoCard';
+import Section from '@/components/common/Section';
+import PromoCard from '@/components/storefront/PromoCard';
 
 export default function FlashSale({ hasDiscounts = true }) {
   return (
