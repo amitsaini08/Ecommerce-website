@@ -1,17 +1,26 @@
 import { Product, Review, User } from '@/lib/db/models';
-import { recalcProductRating, getUserId, formatReview, getReviewSummary, sameId } from '@/lib/reviews';
+import { recalcProductRating, getUserId, formatReview, getReviewSummary } from '@/lib/reviews';
 import { deleteCloudinaryMedia } from '@/lib/cloudinary';
 import { AppError } from '@/app/api/routeHandler';
+import { notificationService } from './notificationService';
+import { sameId } from '@/lib/utils';
+
+async function removeReview(review) {
+  const { _id, productId, mediaUrls } = review;
+  await Review.deleteOne({ _id });
+  await recalcProductRating(productId);
+  await deleteCloudinaryMedia(mediaUrls || []);
+}
 
 export const reviewService = {
- 
+
   async getProductReviews({ slug, user, page = 1, limit = 10 }) {
     const product = await Product.findOne({ slug }).lean();
     if (!product) throw new AppError('Product not found', 404);
-    
+
     const uid = user?._id;
-    
-    const baseFilter = { productId: String(product._id), isHidden: false };
+
+    const baseFilter = { productId: product._id, isHidden: false };
     const othersFilter = uid ? { ...baseFilter, userId: { $ne: String(uid) } } : baseFilter;
 
     const [reviewList, total, summary, mineList] = await Promise.all([
@@ -22,7 +31,7 @@ export const reviewService = {
         ? Review.find({ ...baseFilter, userId: String(uid) }).populate('userId', 'name').sort({ createdAt: -1 }).lean()
         : [],
     ]);
-    
+
     return {
       myReviews: mineList.map(formatReview),
       reviews: reviewList.map(formatReview),
@@ -31,16 +40,16 @@ export const reviewService = {
     };
   },
 
- 
+
   async createReview({ slug, user, data }) {
     const { rating, comment } = data;
 
-    const product = await Product.findOne({ slug }).select('_id').lean();
+    const product = await Product.findOne({ slug }).select('_id name').lean();
     if (!product) throw new AppError('Product not found', 404);
 
     const newReviewCreated = await Review.create({
-      productId: String(product._id),
-      userId: String(getUserId(user)),
+      productId: product._id,
+      userId: getUserId(user),
       userName: user.name,
       rating,
       comment: comment || null,
@@ -50,6 +59,13 @@ export const reviewService = {
     await recalcProductRating(product._id);
     const review = formatReview(newReviewCreated.toObject());
     const summary = await getReviewSummary(product._id);
+
+    notificationService.notifyAdminsSafe({
+      type: 'review',
+      title: 'New review',
+      body: `${review.rating}★ on ${product.name}`,
+      link: '/admin/reviews',
+    });
 
     return { review, summary, productId: String(product._id) };
   },
@@ -74,7 +90,7 @@ export const reviewService = {
     return { review, summary, productId: String(existing.productId), message: 'Review updated successfully!' };
   },
 
- 
+
   async deleteReview({ id, user }) {
     const existing = await Review.findById(id);
 
@@ -82,18 +98,15 @@ export const reviewService = {
     if (!sameId(existing.userId, user._id) && user.role !== 'admin') {
       throw new AppError('Forbidden', 403);
     }
-
-    const { productId, mediaUrls } = existing;
-    await Review.deleteOne({ _id: id });
-    await recalcProductRating(productId);
-    await deleteCloudinaryMedia(mediaUrls || []);
-
+    await removeReview(existing);
+    
+    const productId = existing.productId;
     const summary = await getReviewSummary(productId);
 
     return { ok: true, summary, productId: String(productId), message: 'Review deleted successfully!' };
   },
 
- 
+
   async getAdminReviews({ page = 1, limit = 20 }) {
     const offset = (page - 1) * limit;
 
@@ -112,10 +125,10 @@ export const reviewService = {
     const userMap = new Map(usersList.map((u) => [String(u._id), u]));
 
     const reviewsFormatted = list.map((r) => {
-      const p = productMap.get(String(r.productId));
-      const u = r.userId ? userMap.get(String(r.userId)) : null;
+      const p = productMap.get(r.productId);
+      const u = r.userId ? userMap.get(r.userId) : null;
       return {
-        _id: String(r._id),
+        _id: r._id,
         rating: r.rating,
         comment: r.comment,
         mediaUrls: r.mediaUrls || [],
@@ -134,14 +147,14 @@ export const reviewService = {
     };
   },
 
-  
+
   async createAdminReview(data) {
     const { productId, rating, comment, mediaUrls } = data;
     const product = await Product.findById(productId);
     if (!product) throw new AppError('Product not found', 404);
 
     const newReview = await Review.create({
-      productId: String(product._id),
+      productId: product._id,
       userName: 'Verified Buyer',
       rating: Number(rating),
       comment: comment || null,
@@ -152,7 +165,7 @@ export const reviewService = {
     return { review: newReview.toObject() };
   },
 
-  
+
   async toggleHideReview(id) {
     const review = await Review.findById(id);
     if (!review) throw new AppError('Review not found', 404);
@@ -164,15 +177,14 @@ export const reviewService = {
     return { review: review.toObject() };
   },
 
- 
+
   async deleteAdminReview(id) {
     const review = await Review.findById(id);
     if (!review) throw new AppError('Review not found', 404);
 
-    const productId = review.productId;
-    await Review.deleteOne({ _id: id });
-    await recalcProductRating(productId);
+    await removeReview(review);
 
     return { message: 'Deleted' };
   },
+    
 };

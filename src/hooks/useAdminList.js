@@ -12,14 +12,14 @@ export function useAdminList(endpoint, key) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reloadToken, setReloadToken] = useState(0);
-
+  const sep = endpoint.includes('?') ? '&' : '?';
   useEffect(() => {
     const controller = new AbortController();
     queueMicrotask(() => setLoading(true));
 
     (async () => {
       try {
-        const data = await api.get(`${endpoint}?page=${page}`, { signal: controller.signal });
+        const data = await api.get(`${endpoint}${sep}page=${page}`, { signal: controller.signal });
         setItems(data?.[key] || []);
         setPagination(data?.pagination || { page, totalPages: 1 });
         setError('');

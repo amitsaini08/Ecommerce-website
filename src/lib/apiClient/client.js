@@ -12,14 +12,14 @@ export class ApiError extends Error {
 
 async function request(method, url, { body, headers: customHeaders, signal } = {}) {
   const hasBody = body !== undefined;
-  
+
   let socketId;
   try {
     if (typeof window !== 'undefined') {
       const socket = getSocket();
       if (socket && socket.id) socketId = socket.id;
     }
-  } catch {}
+  } catch { }
   const headers = {
     ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
     ...(socketId ? { 'x-socket-id': socketId } : {}),
@@ -41,7 +41,7 @@ async function request(method, url, { body, headers: customHeaders, signal } = {
   if (!res.ok) {
     throw new ApiError(
       data?.error || data?.message ||
-        (res.status >= 500 ? 'Something went wrong on our side.' : 'Request failed'),
+      (res.status >= 500 ? 'Something went wrong on our side.' : 'Request failed'),
       { status: res.status, field: data?.field, errors: data?.errors }
     );
   }
@@ -52,5 +52,5 @@ export const api = {
   post: (url, body, opts) => request('POST', url, { ...opts, body }),
   put: (url, body, opts) => request('PUT', url, { ...opts, body }),
   patch: (url, body, opts) => request('PATCH', url, { ...opts, body }),
-  del: (url, opts) => request('DELETE', url, opts),
+  del: (url, opts) => request('DELETE', url, { ...opts, body: opts?.body }),
 };

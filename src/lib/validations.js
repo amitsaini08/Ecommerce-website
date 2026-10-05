@@ -162,3 +162,11 @@ export const bannerSchema = z.object({
   isActive: z.boolean().optional().default(true),
   sortOrder: z.coerce.number().optional().default(0),
 });
+
+export const pushSubscriptionSchema = z.object({
+  endpoint: z.string().url(),
+  keys: z.object({
+    p256dh: z.string().min(1),
+    auth: z.string().min(1),
+  }),
+});

@@ -1,7 +1,8 @@
 import Razorpay from 'razorpay';
 import { Product, Coupon, Order, StoreSettings, User } from '@/lib/db/models';
 import { AppError } from '@/app/api/routeHandler';
-import { sameId } from '@/lib/reviews';
+import { sameId } from '@/lib/utils';
+import { notificationService, orderRef } from './notificationService';
 
 const razorpayKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
 const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
@@ -9,6 +10,19 @@ const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
 let razorpay = null;
 if (razorpayKeyId && razorpayKeySecret) {
   razorpay = new Razorpay({ key_id: razorpayKeyId, key_secret: razorpayKeySecret });
+}
+const canAccess = (order, user) => !order.userId || sameId(order.userId, user._id) || user.role === 'admin';
+
+function customerMessage(action, order, { status, paymentStatus }) {
+  const ref = orderRef(order);
+  return {
+    approve_cancel: ['Cancellation approved', `Your order #${ref} was cancelled.`],
+    reject_cancel: ['Cancellation rejected', `Your cancellation request for #${ref} was declined.`],
+    approve_return: ['Return approved', `Your return request for #${ref} was approved.`],
+    reject_return: ['Return rejected', `Your return request for #${ref} was declined.`],
+    update_payment_status: ['Payment updated', `Payment status for #${ref}: ${paymentStatus}.`],
+    update_status: [`Order ${status}`, `Your order #${ref} is now ${status}.`],
+  }[action];
 }
 
 export const orderService = {
@@ -47,7 +61,7 @@ export const orderService = {
       subtotal += unitPrice * item.quantity;
 
       validatedItems.push({
-        productId: String(product._id),
+        productId: product._id,
         quantity: item.quantity,
         priceAtPurchase: unitPrice,
         name: product.name,
@@ -77,14 +91,23 @@ export const orderService = {
 
     if (paymentMethod === 'cod') {
       for (const item of validatedItems) {
-        await Product.updateOne(
+        const updated = await Product.findOneAndUpdate(
           { _id: item.productId },
-          { $inc: { stock: -item.quantity } }
+          { $inc: { stock: -item.quantity } },
+          { new: true }
         );
+        if (updated && updated.stock <= 5 && updated.stock + item.quantity > 5) {
+          notificationService.notifyAdminsSafe({
+            type: 'low_stock',
+            title: 'Low stock',
+            body: `${updated.name} has only ${updated.stock} left.`,
+            link: `/admin/products/${updated._id}/edit`,
+          });
+        }
       }
 
       const newOrder = await Order.create({
-        userId: String(user._id),
+        userId: user._id,
         status: 'confirmed',
         paymentStatus: 'pending',
         paymentMethod: 'cod',
@@ -98,6 +121,8 @@ export const orderService = {
           { status: 'confirmed', note: 'COD order placed and confirmed.', changedAt: new Date() },
         ],
       });
+
+      notificationService.orderPlaced({ order: newOrder });
 
       return {
         orderId: String(newOrder._id),
@@ -117,14 +142,24 @@ export const orderService = {
     });
 
     for (const item of validatedItems) {
-      await Product.updateOne(
+      const updated = await Product.findOneAndUpdate(
         { _id: item.productId },
-        { $inc: { stock: -item.quantity } }
+        { $inc: { stock: -item.quantity } },
+        { new: true }
       );
+
+      if (updated && updated.stock <= 5 && updated.stock + item.quantity > 5) {
+        notificationService.notifyAdminsSafe({
+          type: 'low_stock',
+          title: 'Low stock',
+          body: `${updated.name} has only ${updated.stock} left.`,
+          link: `/admin/products/${updated._id}/edit`,
+        });
+      }
     }
 
     const newOrder = await Order.create({
-      userId: String(user._id),
+      userId: user._id,
       status: 'pending',
       paymentStatus: 'pending',
       paymentMethod: 'razorpay',
@@ -152,11 +187,11 @@ export const orderService = {
     };
   },
 
- 
+
   async cancelOrder({ user, orderId, reason }) {
     const order = await Order.findById(orderId);
 
-    if (!order || (order.userId && !sameId(order.userId, user._id) && user.role !== 'admin')) {
+    if (!order || !canAccess(order, user)) {
       throw new AppError('Order not found', 404);
     }
 
@@ -174,6 +209,12 @@ export const orderService = {
 
     await order.save();
 
+    if (user.role !== 'admin') {
+      notificationService.adminOrderAlert(order,
+        'Order cancelled',
+        `Order #${orderRef(order)} was cancelled by the customer. Reason: ${reason}`);
+    }
+
     for (const item of order.items || []) {
       await Product.updateOne(
         { _id: item.productId },
@@ -190,7 +231,7 @@ export const orderService = {
   async returnOrder({ user, orderId, reason }) {
     const order = await Order.findById(orderId);
 
-    if (!order || (order.userId && !sameId(order.userId, user._id) && user.role !== 'admin')) {
+    if (!order || !canAccess(order, user)) {
       throw new AppError('Order not found', 404);
     }
 
@@ -213,6 +254,8 @@ export const orderService = {
 
     await order.save();
 
+    notificationService.adminOrderAlert(order, 'Return request', `Order #${orderRef(order)}: ${reason}`);
+
     return {
       message: 'Return request submitted successfully! Admin will review your request.',
     };
@@ -220,8 +263,11 @@ export const orderService = {
 
 
   async adminOrderAction({ orderId, action, status, paymentStatus, reason }) {
+
     const order = await Order.findById(orderId);
-    if (!order) throw new AppError('Order not found', 404);
+    if (!order) { throw new AppError('Order not found', 404); }
+
+    const msg = customerMessage(action, order, { status, paymentStatus });
 
     async function restoreOrderStock() {
       for (const item of order.items || []) {
@@ -232,79 +278,99 @@ export const orderService = {
       }
     }
 
+    let message;
+
     if (action === 'approve_cancel') {
       order.status = 'cancelled';
+
       order.statusHistory.push({
-        status: 'cancelled',
-        note: `Cancellation approved by admin. ${reason ? `Note: ${reason}` : ''}`,
+        status: 'cancelled', note: `Cancellation approved by admin. ${reason ? `Note: ${reason}` : ''}`,
         changedAt: new Date(),
       });
+
       await order.save();
       await restoreOrderStock();
-      return { message: 'Cancellation approved. Stock restored!' };
+
+      message = 'Cancellation approved. Stock restored!';
     }
 
-    if (action === 'reject_cancel') {
+    else if (action === 'reject_cancel') {
       order.statusHistory.push({
         status: order.status,
         note: `Cancellation request rejected by admin. ${reason ? `Reason: ${reason}` : ''}`,
         changedAt: new Date(),
       });
+
       await order.save();
-      return { message: 'Cancellation request rejected.' };
+      message = 'Cancellation request rejected.';
     }
 
-    if (action === 'approve_return') {
+    else if (action === 'approve_return') {
       order.returnStatus = 'approved';
       order.paymentStatus = 'refunded';
+
       order.statusHistory.push({
         status: order.status,
         note: `Return/Refund approved by admin. ${reason ? `Note: ${reason}` : ''}`,
         changedAt: new Date(),
       });
+
       await order.save();
       await restoreOrderStock();
-      return { message: 'Return approved! Payment marked as refunded and stock restored.' };
+
+      message = 'Return approved! Payment marked as refunded and stock restored.';
     }
 
-    if (action === 'reject_return') {
+    else if (action === 'reject_return') {
       order.returnStatus = 'rejected';
+
       order.statusHistory.push({
         status: order.status,
         note: `Return request rejected by admin. ${reason ? `Reason: ${reason}` : ''}`,
         changedAt: new Date(),
       });
+
       await order.save();
-      return { message: 'Return request rejected.' };
+      message = 'Return request rejected.';
     }
 
-    if (action === 'update_status' && status) {
+    else if (action === 'update_status' && status) {
       order.status = status;
+
       order.statusHistory.push({
         status,
         note: `Status updated to ${status} by admin. ${reason ? `Note: ${reason}` : ''}`,
         changedAt: new Date(),
       });
+
       await order.save();
 
-      if (status === 'cancelled') {
-        await restoreOrderStock();
-      }
-      return { message: `Order status updated to ${status}` };
+      if (status === 'cancelled') { await restoreOrderStock(); }
+
+      message = `Order status updated to ${status}`;
     }
 
-    if (action === 'update_payment_status' && paymentStatus) {
+    else if (action === 'update_payment_status' && paymentStatus) {
       order.paymentStatus = paymentStatus;
+
       order.statusHistory.push({
         status: order.status,
         note: `Payment status updated to ${paymentStatus} by admin.`,
         changedAt: new Date(),
       });
+
       await order.save();
-      return { message: `Payment status updated to ${paymentStatus}` };
+      message = `Payment status updated to ${paymentStatus}`;
     }
 
-    throw new AppError('Invalid action configuration', 400);
+    else {
+      throw new AppError('Invalid action configuration', 400);
+    }
+
+
+    if (msg) notificationService.orderUpdate(order, ...msg);
+
+    return { message };
   },
 
 
@@ -313,7 +379,7 @@ export const orderService = {
 
     if (!order) throw new AppError('Order not found', 404);
 
-    if (order.userId && !sameId(user._id, order.userId) && user.role !== 'admin') {
+    if (order.userId && !canAccess(order, user)) {
       throw new AppError('Order not found', 404);
     }
 
@@ -324,8 +390,8 @@ export const orderService = {
     const items = (order.items || []).map((item) => {
       const prod = productMap.get(String(item.productId));
       return {
-        _id: String(item._id),
-        productId: String(item.productId),
+        _id: item._id,
+        productId: item.productId,
         quantity: item.quantity,
         priceAtPurchase: item.priceAtPurchase,
         addons: item.addons || [],
@@ -406,7 +472,7 @@ export const orderService = {
       pipeline.push({
         $match: {
           $or: [
-            { idString: { $regex: search, $options: 'i' } },
+            { idString: { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
             { effectiveName: { $regex: search, $options: 'i' } },
             { effectiveEmail: { $regex: search, $options: 'i' } },
             { effectivePhone: { $regex: search, $options: 'i' } },
@@ -454,7 +520,7 @@ export const orderService = {
    */
   async getUserOrders({ user, page = 1, limit = 10 }) {
     const offset = (page - 1) * limit;
-    const query = { $or: [{ userId: String(user._id) }, { userId: user._id }] };
+    const query = { userId: user._id };
     const orderList = await Order.find(query).sort({ createdAt: -1 }).skip(offset).limit(limit).lean();
     const count = await Order.countDocuments(query);
 
@@ -511,7 +577,7 @@ export const orderService = {
     };
   },
 
- 
+
   async updateAdminOrder({ id, data }) {
     const { status, reason, paymentStatus, action } = data;
 

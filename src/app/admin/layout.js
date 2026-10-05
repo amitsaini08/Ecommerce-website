@@ -4,22 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
-import {
-  LayoutDashboard,
-  Package,
-  FolderTree,
-  Tag,
-  Star,
-  ShoppingBag,
-  Users,
-  Settings,
-  LogOut,
-  Menu,
-  X,
-  Store,
-  ChevronRight,
-  Image as ImageIcon,
-} from 'lucide-react';
+import { LayoutDashboard, Package, FolderTree, Tag, Star, ShoppingBag, Users, Settings, LogOut, Menu, X, Store, ChevronRight, Image as ImageIcon, Bell, } from 'lucide-react';
 import { selectUser, clearUser } from '@/lib/store/authSlice';
 import { cn } from '@/lib/cn';
 import Logo from '@/components/common/Logo';
@@ -28,6 +13,7 @@ import Avatar from '@/components/ui/Avatar';
 import IconButton from '@/components/ui/IconButton';
 import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
+import NotificationBell from '@/components/common/NotificationBell';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
@@ -146,12 +132,19 @@ export default function AdminLayout({ children }) {
 
             <p className="hidden text-sm font-medium text-warm-500 lg:block">Admin management portal</p>
 
+
             <div className="ml-auto flex items-center gap-3">
-              <div className="hidden text-right sm:block">
-                <p className="text-xs font-semibold leading-tight text-warm-900">{user.name}</p>
-                <p className="text-[14px] text-warm-500">{user.email}</p>
+              {/* <IconButton label="Notifications" href="/admin/notifications" >
+                <Bell className="h-5 w-5" />
+              </IconButton> */}
+              {user && <NotificationBell forRole='admin' />}
+              <div className=" flex items-center justify-center text-left gap-3">
+                <Avatar user={user} size="sm" />
+                <div className="mt-1">
+                  <p className="text-xs font-semibold leading-tight text-warm-900">{user.name}</p>
+                  <p className="text-[14px] text-warm-500">{user.email}</p>
+                </div>
               </div>
-              <Avatar user={user} size="sm" />
             </div>
           </Container>
         </header>

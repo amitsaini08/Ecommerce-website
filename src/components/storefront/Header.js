@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSelector } from 'react-redux';
-import { Search, Heart, ShoppingBag, Menu, X } from 'lucide-react';
+import { Search, Heart, ShoppingBag, Menu, X, Bell } from 'lucide-react';
 import { selectCartItemCount } from '@/lib/store/cartSlice';
 import { selectWishlistItemCount } from '@/lib/store/wishlistSlice';
 import { NAV_LINKS } from '@/lib/constants/nav';
@@ -14,11 +14,14 @@ import NavLink from '@/components/ui/NavLink';
 import CategoriesMenu from './CategoriesMenu';
 import AccountMenu from './AccountMenu';
 import SearchOverlay from './SearchOverlay';
+import NotificationBell from '../common/NotificationBell';
+
 
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const user = useSelector((state) => state.auth.user);
 
   const cartCount = useSelector(selectCartItemCount);
   const wishlistCount = useSelector(selectWishlistItemCount);
@@ -60,9 +63,12 @@ export default function Header() {
 
             {/* Actions */}
             <div className="flex items-center gap-1">
+
               <IconButton label="Search" onClick={() => setSearchOpen(true)}>
                 <Search className="h-5 w-5" />
               </IconButton>
+
+              {user && <NotificationBell />}
 
               <IconButton
                 href="/wishlist"

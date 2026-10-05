@@ -8,6 +8,7 @@ import { selectUser, clearUser } from '@/lib/store/authSlice';
 import Dropdown from '@/components/ui/Dropdown';
 import MenuItem from '@/components/ui/MenuItem';
 import Avatar from '@/components/ui/Avatar';
+import { removePushSubscription } from '@/hooks/usePushNotifications';
 
 export default function AccountMenu() {
   const [open, setOpen] = useState(false);
@@ -18,6 +19,7 @@ export default function AccountMenu() {
   const close = () => setOpen(false);
 
   const handleLogout = async () => {
+    await removePushSubscription();
     await fetch('/api/auth/logout', { method: 'POST' });
     dispatch(clearUser());
     close();

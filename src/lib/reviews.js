@@ -12,7 +12,6 @@ export async function recalcProductRating(productId) {
   );
 }
 
-export const sameId = (a, b) => a != null && b != null && String(a) === String(b);
 export const getUserId = (user) => user?._id ?? user?.id;
 
 

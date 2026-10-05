@@ -3,18 +3,8 @@ import { getAllDescendantIds } from '@/lib/categoryHelpers';
 import { AppError } from '@/app/api/routeHandler';
 
 export const productService = {
-  
-  async getPublicProducts({
-    page = 1,
-    limit = 12,
-    sort = 'newest',
-    category,
-    search,
-    minPrice,
-    maxPrice,
-    minRating,
-    inStockOnly = false,
-  }) {
+
+  async getPublicProducts({ page = 1, limit = 12, sort = 'newest', category, search, minPrice, maxPrice, minRating, inStockOnly = false, }) {
     const offset = (page - 1) * limit;
     const query = { isActive: true };
 
@@ -97,7 +87,7 @@ export const productService = {
     };
   },
 
- 
+
   async getProductBySlug(slug) {
     const product = await Product.findOne({ slug }).lean();
 
@@ -119,10 +109,7 @@ export const productService = {
 
     return {
       product: {
-        ...rest,
-        categoryName,
-        categorySlug,
-        categories,
+        ...rest, categoryName, categorySlug, categories,
       },
     };
   },
@@ -265,7 +252,7 @@ export const productService = {
     return { product: product.toObject() };
   },
 
- 
+
   async deleteProduct(id) {
     const res = await Product.deleteOne({ _id: id });
     if (res.deletedCount === 0) throw new AppError('Product not found', 404);

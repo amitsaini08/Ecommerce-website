@@ -2,7 +2,8 @@ import crypto from 'crypto';
 import Razorpay from 'razorpay';
 import { Order, Product } from '@/lib/db/models';
 import { AppError } from '@/app/api/routeHandler';
-import { sameId } from '@/lib/reviews';
+import { sameId } from '@/lib/utils';
+import { notificationService } from './notificationService';
 
 const razorpayKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
 const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
@@ -11,6 +12,11 @@ let razorpay = null;
 if (razorpayKeyId && razorpayKeySecret) {
   razorpay = new Razorpay({ key_id: razorpayKeyId, key_secret: razorpayKeySecret });
 }
+const safeEqual = (a, b) => {
+  const x = Buffer.from(String(a));
+  const y = Buffer.from(String(b));
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+};
 
 export const paymentService = {
 
@@ -29,6 +35,8 @@ export const paymentService = {
     const order = await Order.findById(orderId);
     if (!order) throw new AppError('Order not found', 404);
 
+    const wasPaid = order.paymentStatus === 'paid';
+
     order.status = 'confirmed';
     order.paymentStatus = 'paid';
     order.razorpayPaymentId = razorpay_payment_id;
@@ -41,13 +49,17 @@ export const paymentService = {
 
     await order.save();
 
+    if (!wasPaid) {
+      notificationService.orderPlaced({ order });
+    }
+
     return {
       orderId: String(order._id),
       message: 'Payment verified successfully! Order confirmed.',
     };
   },
 
-  
+
   async retryPayment({ user, orderId }) {
     if (!orderId) throw new AppError('Order ID is required', 400);
 
@@ -86,20 +98,15 @@ export const paymentService = {
     };
   },
 
-  
+
   async handleWebhook({ rawBody, signature }) {
-    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || process.env.RAZORPAY_KEY_SECRET;
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
-    if (webhookSecret && signature) {
-      const expectedSignature = crypto
-        .createHmac('sha256', webhookSecret)
-        .update(rawBody)
-        .digest('hex');
+    if (!webhookSecret) throw new AppError('Webhook secret not configured', 500);
+    if (!signature) return { error: 'Missing signature', status: 400 };
 
-      if (expectedSignature !== signature) {
-        return { error: 'Invalid webhook signature', status: 400 };
-      }
-    }
+    const expected = crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
+    if (!safeEqual(expected, signature)) return { error: 'Invalid webhook signature', status: 400 };
 
     const payload = JSON.parse(rawBody);
     const event = payload.event;
@@ -126,6 +133,8 @@ export const paymentService = {
           changedAt: new Date(),
         });
         await order.save();
+
+        notificationService.orderPlaced({ order });
       }
     }
 
@@ -139,12 +148,22 @@ export const paymentService = {
         });
         await order.save();
 
-        for (const item of order.items || []) {
-          await Product.updateOne(
-            { _id: item.productId },
-            { $inc: { stock: item.quantity } }
-          );
+        if (order.userId) {
+          notificationService.notifySafe({
+            userId: order.userId,
+            type: 'payment',
+            title: 'Payment failed',
+            body: 'Your payment could not be completed. You can retry from your orders.',
+            link: `/orders/${order._id}`,
+          });
         }
+
+        // for (const item of order.items || []) {
+        //   await Product.updateOne(
+        //     { _id: item.productId },
+        //     { $inc: { stock: item.quantity } }
+        //   );
+        // }
       }
     }
 

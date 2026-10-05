@@ -8,6 +8,8 @@ import Order from './Order.js';
 import StoreSettings from './StoreSettings.js';
 import Banner from './Banner.js';
 import PageView from './PageView.js';
+import Notification from './Notification.js';
+import PushSubscription from './PushSubscription.js';
 
 export {
   connectToDatabase,
@@ -20,4 +22,6 @@ export {
   StoreSettings,
   Banner,
   PageView,
+  Notification,
+  PushSubscription
 };

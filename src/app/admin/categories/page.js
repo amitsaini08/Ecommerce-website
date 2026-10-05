@@ -300,8 +300,7 @@ export default function AdminCategoriesPage() {
         </div>
         <button
           onClick={openCreate}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-warm-900 text-white text-[11px] font-semibold rounded-md hover:bg-warm-800 transition-all shadow-xs"
-        >
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-warm-900 text-white text-[11px] font-semibold rounded-md hover:bg-warm-800 transition-all shadow-xs" >
           <Plus className="w-3.5 h-3.5" />
           <span>Add Category</span>
         </button>
